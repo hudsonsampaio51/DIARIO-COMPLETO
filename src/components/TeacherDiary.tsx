@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Fragment } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, getDocs, query, where, Timestamp, deleteDoc, doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { Student, Class, Attendance, Grade, UserRole, ClassSession, Staff, Subject, Occurrence } from '../types';
@@ -28,6 +28,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
   const [attendanceObs, setAttendanceObs] = useState<Record<string, string>>({});
   const [grades, setGrades] = useState<Record<string, Partial<Grade>>>({});
+  const [consolidatedGrades, setConsolidatedGrades] = useState<Record<string, Record<string, Partial<Grade>>>>({});
   const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
   const [mode, setMode] = useState<'attendance' | 'grades' | 'occurrences'>('attendance');
   const [period, setPeriod] = useState('1º Bimestre');
@@ -35,6 +36,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
   const [newSessionHours, setNewSessionHours] = useState(1);
   const [newSessionContent, setNewSessionContent] = useState('');
   const [newSessionSpecialType, setNewSessionSpecialType] = useState<string>('');
+  const [newSessionSubjectId, setNewSessionSubjectId] = useState<string>('');
   const [editingContent, setEditingContent] = useState<string>('');
   const [selectedReportMonth, setSelectedReportMonth] = useState(new Date().getMonth() + 1);
   const [feedback, setFeedback] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
@@ -43,6 +45,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
   const [filterTeacherId, setFilterTeacherId] = useState<string>(role === 'admin' || role === 'supervisor' ? '' : teacherId);
   const [loadingData, setLoadingData] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+  const printGradesRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (feedback) {
@@ -215,7 +218,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
           
           const [studentsSnap, subjectsSnap, occurrencesSnap] = await Promise.all([
             getDocs(query(collection(db, 'students'), where('classId', '==', selectedClass.id), where('schoolId', '==', effectiveSchoolId))),
-            getDocs((role === 'admin' || role === 'supervisor') && !filterTeacherId 
+            getDocs((role === 'admin' || role === 'supervisor' || selectedClass.educationLevel === 'Ensino Fundamental I') && !filterTeacherId 
               ? query(collection(db, 'subjects'), where('classId', '==', selectedClass.id), where('schoolId', '==', effectiveSchoolId))
               : query(collection(db, 'subjects'), where('classId', '==', selectedClass.id), where('teacherId', '==', currentTeacherId), where('schoolId', '==', effectiveSchoolId))
             ),
@@ -230,7 +233,9 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
           setSubjects(fetchedSubjects);
           setOccurrences(fetchedOccurrences);
 
-          if (fetchedSubjects.length > 0) {
+          if (selectedClass.educationLevel === 'Ensino Fundamental I' && mode !== 'grades') {
+            setSelectedSubjectId('TODAS');
+          } else if (fetchedSubjects.length > 0) {
             setSelectedSubjectId(fetchedSubjects[0].id);
           } else {
             setSelectedSubjectId('');
@@ -247,11 +252,19 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
 
   const fetchSessionsData = async (classId: string, subjectId: string) => {
     try {
-      const q = query(
-        collection(db, 'classSessions'), 
-        where('classId', '==', classId),
-        where('subjectId', '==', subjectId)
-      );
+      let q;
+      if (subjectId === 'TODAS') {
+        q = query(
+          collection(db, 'classSessions'), 
+          where('classId', '==', classId)
+        );
+      } else {
+        q = query(
+          collection(db, 'classSessions'), 
+          where('classId', '==', classId),
+          where('subjectId', '==', subjectId)
+        );
+      }
       const snap = await getDocs(q);
       const fetchedSessions = snap.docs.map(d => ({ id: d.id, ...d.data() as any } as ClassSession));
       
@@ -296,11 +309,19 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       };
       const fetchMonthlyAttendance = async () => {
         try {
-          const q = query(
-            collection(db, 'attendance'), 
-            where('classId', '==', selectedClass.id),
-            where('subjectId', '==', selectedSubjectId)
-          );
+          let q;
+          if (selectedSubjectId === 'TODAS') {
+            q = query(
+              collection(db, 'attendance'), 
+              where('classId', '==', selectedClass.id)
+            );
+          } else {
+            q = query(
+              collection(db, 'attendance'), 
+              where('classId', '==', selectedClass.id),
+              where('subjectId', '==', selectedSubjectId)
+            );
+          }
           const snap = await getDocs(q);
           setMonthlyAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() as any } as Attendance)));
         } catch (error) {
@@ -314,6 +335,39 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
   }, [selectedClass, selectedSubjectId, period]);
 
   useEffect(() => {
+    if (selectedSessionId && monthlyAttendance.length > 0) {
+      const sessionAttendance = monthlyAttendance.filter(a => a.sessionId === selectedSessionId);
+      const newAttendance: Record<string, 'present' | 'absent'> = {};
+      const newAttendanceObs: Record<string, string> = {};
+      
+      sessionAttendance.forEach(a => {
+        newAttendance[a.studentId] = a.status;
+        newAttendanceObs[a.studentId] = a.observations || '';
+      });
+      
+      setAttendance(newAttendance);
+      setAttendanceObs(newAttendanceObs);
+    } else {
+      setAttendance({});
+      setAttendanceObs({});
+    }
+  }, [selectedSessionId, monthlyAttendance]);
+
+  useEffect(() => {
+    if (selectedClass?.educationLevel === 'Ensino Fundamental I') {
+      if (mode !== 'grades') {
+        setSelectedSubjectId('TODAS');
+      } else if (selectedSubjectId === 'TODAS') {
+        if (subjects.length > 0) {
+          setSelectedSubjectId(subjects[0].id);
+        } else {
+          setSelectedSubjectId('');
+        }
+      }
+    }
+  }, [mode, selectedClass, subjects]);
+
+  useEffect(() => {
     if (selectedSessionId && sessions.length > 0) {
       const session = sessions.find(s => s.id === selectedSessionId);
       if (session) {
@@ -323,22 +377,47 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
   }, [selectedSessionId, sessions]);
 
   useEffect(() => {
-    if (selectedClass && selectedSubjectId && mode === 'grades') {
+    if (selectedClass && mode === 'grades') {
       const fetchGrades = async () => {
         try {
-          const q = query(
-            collection(db, 'grades'),
-            where('classId', '==', selectedClass.id),
-            where('subjectId', '==', selectedSubjectId),
-            where('period', '==', period)
-          );
+          let q;
+          if (selectedClass.educationLevel === 'Ensino Fundamental I') {
+            q = query(
+              collection(db, 'grades'),
+              where('classId', '==', selectedClass.id),
+              where('period', '==', period)
+            );
+          } else if (selectedSubjectId) {
+            q = query(
+              collection(db, 'grades'),
+              where('classId', '==', selectedClass.id),
+              where('subjectId', '==', selectedSubjectId),
+              where('period', '==', period)
+            );
+          } else {
+            return;
+          }
+
           const snap = await getDocs(q);
-          const fetchedGrades: Record<string, Partial<Grade>> = {};
-          snap.docs.forEach(d => {
-            const data = d.data() as Grade;
-            fetchedGrades[data.studentId] = data;
-          });
-          setGrades(fetchedGrades);
+          
+          if (selectedClass.educationLevel === 'Ensino Fundamental I') {
+            const fetched: Record<string, Record<string, Partial<Grade>>> = {};
+            snap.docs.forEach(d => {
+              const data = d.data() as Grade;
+              if (!fetched[data.studentId]) fetched[data.studentId] = {};
+              if (data.subjectId) {
+                fetched[data.studentId][data.subjectId] = { ...data, id: d.id };
+              }
+            });
+            setConsolidatedGrades(fetched);
+          } else {
+            const fetched: Record<string, Partial<Grade>> = {};
+            snap.docs.forEach(d => {
+              const data = d.data() as Grade;
+              fetched[data.studentId] = { ...data, id: d.id };
+            });
+            setGrades(fetched);
+          }
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, 'grades');
         }
@@ -347,37 +426,135 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
     }
   }, [selectedClass, selectedSubjectId, period, mode]);
 
-  const updateGrade = (studentId: string, field: keyof Grade, value: string) => {
+  const initializeEF1Subjects = async () => {
+    if (!selectedClass || selectedClass.educationLevel !== 'Ensino Fundamental I' || !effectiveSchoolId) return;
+    
+    const standardSubjects = [
+      'Língua Portuguesa',
+      'Matemática',
+      'Ciências',
+      'História',
+      'Geografia',
+      'Arte',
+      'Educação Física',
+      'Ensino Religioso'
+    ];
+    
+    try {
+      setLoadingData(true);
+      
+      // Fetch ALL subjects for this class to check for existing ones, 
+      // regardless of the current teacher filter in the state
+      const allSubjectsSnap = await getDocs(query(
+        collection(db, 'subjects'), 
+        where('classId', '==', selectedClass.id),
+        where('schoolId', '==', effectiveSchoolId)
+      ));
+      
+      const existingSubjectNames = allSubjectsSnap.docs.map(d => (d.data() as any).name);
+      const subjectsToAdd = standardSubjects.filter(name => !existingSubjectNames.includes(name));
+      
+      if (subjectsToAdd.length === 0) {
+        setFeedback({ message: 'Todas as disciplinas já estão cadastradas para esta turma.', type: 'success' });
+        return;
+      }
+
+      const effectiveTeacherId = teacherProfile?.id || teacherId;
+      
+      for (const name of subjectsToAdd) {
+        await addDoc(collection(db, 'subjects'), {
+          name,
+          classId: selectedClass.id,
+          schoolId: effectiveSchoolId,
+          teacherId: effectiveTeacherId
+        });
+      }
+      
+      // Refresh subjects for the current view
+      const currentTeacherId = (role === 'admin' || role === 'supervisor') ? filterTeacherId : effectiveTeacherId;
+      const subjectsQuery = (role === 'admin' || role === 'supervisor' || selectedClass.educationLevel === 'Ensino Fundamental I') && !filterTeacherId 
+        ? query(collection(db, 'subjects'), where('classId', '==', selectedClass.id), where('schoolId', '==', effectiveSchoolId))
+        : query(collection(db, 'subjects'), where('classId', '==', selectedClass.id), where('teacherId', '==', currentTeacherId), where('schoolId', '==', effectiveSchoolId));
+      
+      const subjectsSnap = await getDocs(subjectsQuery);
+      const fetchedSubjects = subjectsSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Subject));
+      setSubjects(fetchedSubjects);
+      if (fetchedSubjects.length > 0 && !selectedSubjectId) {
+        setSelectedSubjectId(fetchedSubjects[0].id);
+      }
+      
+      setFeedback({ message: 'Disciplinas inicializadas com sucesso!', type: 'success' });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'subjects');
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  const updateGrade = (studentId: string, field: keyof Grade, value: string, subjectId?: string) => {
     const numValue = parseFloat(value) || 0;
-    setGrades(prev => {
-      const currentGrade = prev[studentId] || {};
-      const updatedGrade = { ...currentGrade, [field]: numValue };
-      
-      // Calculate total automatically
-      const total = (updatedGrade.writtenActivity1 || 0) + 
-                    (updatedGrade.writtenActivity2 || 0) + 
-                    (updatedGrade.notebookGrade || 0) + 
-                    (updatedGrade.homeworkGrade || 0);
-      
-      return {
-        ...prev,
-        [studentId]: { ...updatedGrade, value: total }
-      };
-    });
+    const targetSubjectId = subjectId || selectedSubjectId;
+    
+    if (selectedClass?.educationLevel === 'Ensino Fundamental I') {
+      setConsolidatedGrades(prev => {
+        const studentGrades = prev[studentId] || {};
+        const currentGrade = studentGrades[targetSubjectId] || {};
+        const updatedGrade = { ...currentGrade, [field]: numValue };
+        
+        // Calculate total automatically
+        const total = (updatedGrade.writtenActivity1 || 0) + 
+                      (updatedGrade.writtenActivity2 || 0) + 
+                      (updatedGrade.projectGrade || 0) +
+                      (updatedGrade.oralActivityGrade || 0) +
+                      (updatedGrade.notebookGrade || 0);
+        
+        return {
+          ...prev,
+          [studentId]: {
+            ...studentGrades,
+            [targetSubjectId]: { ...updatedGrade, value: total }
+          }
+        };
+      });
+    } else {
+      setGrades(prev => {
+        const currentGrade = prev[studentId] || {};
+        const updatedGrade = { ...currentGrade, [field]: numValue };
+        
+        // Calculate total automatically
+        const total = (updatedGrade.writtenActivity1 || 0) + 
+                      (updatedGrade.writtenActivity2 || 0) + 
+                      (updatedGrade.notebookGrade || 0) + 
+                      (updatedGrade.homeworkGrade || 0);
+        
+        return {
+          ...prev,
+          [studentId]: { ...updatedGrade, value: total }
+        };
+      });
+    }
   };
 
   const handleAddSession = async () => {
     if (!selectedClass || !newSessionDate || !selectedSubjectId) return;
     try {
       const effectiveTeacherId = teacherProfile?.id || teacherId;
+      const isEF1 = selectedClass.educationLevel === 'Ensino Fundamental I';
+      const targetSubjectId = (selectedSubjectId === 'TODAS' ? newSessionSubjectId : selectedSubjectId) || (subjects.length > 0 ? subjects[0].id : '');
+      
+      if (!targetSubjectId) {
+        setFeedback({ message: 'Selecione uma disciplina para a aula!', type: 'error' });
+        return;
+      }
+
       await addDoc(collection(db, 'classSessions'), {
         classId: selectedClass.id,
-        subjectId: selectedSubjectId,
+        subjectId: targetSubjectId,
         teacherId: effectiveTeacherId,
         date: newSessionDate,
-        lessonNumber: newSessionHours,
+        lessonNumber: isEF1 ? 1 : newSessionHours,
         description: newSessionContent,
-        specialType: newSessionSpecialType || null,
+        specialType: isEF1 ? null : (newSessionSpecialType || null),
         period: period,
         schoolId: effectiveSchoolId,
         createdAt: new Date().toISOString()
@@ -386,6 +563,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       setNewSessionHours(1);
       setNewSessionContent('');
       setNewSessionSpecialType('');
+      setNewSessionSubjectId('');
       setFeedback({ message: 'Aula registrada com sucesso!', type: 'success' });
       
       await fetchSessionsData(selectedClass.id, selectedSubjectId);
@@ -484,6 +662,75 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
     printWindow.document.close();
   };
 
+  const handlePrintGrades = () => {
+    if (!selectedClass || !selectedSubjectId) {
+      setFeedback({ message: 'Selecione uma turma e uma disciplina antes de gerar o PDF.', type: 'error' });
+      return;
+    }
+
+    const element = printGradesRef.current;
+    if (!element) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setFeedback({ 
+        message: 'O bloqueador de pop-ups impediu a abertura. Por favor, clique no ícone de "Abrir em nova aba" no topo da tela.', 
+        type: 'error' 
+      });
+      return;
+    }
+
+    setFeedback({ message: 'Abrindo janela de impressão...', type: 'success' });
+
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(style => style.outerHTML)
+      .join('\n');
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ficha de Notas - ${selectedClass.name}</title>
+          ${styles}
+          <style>
+            @media print {
+              @page { size: portrait; margin: 1cm; }
+              body, body * { visibility: visible !important; }
+              .no-print { display: none !important; }
+            }
+            body { 
+              font-family: sans-serif; 
+              padding: 0; 
+              margin: 0;
+              background: white !important; 
+              color: black !important;
+            }
+            .print-container { 
+              width: 100%;
+              background: white !important;
+            }
+            table { border-collapse: collapse !important; width: 100%; }
+            th, td { border: 1px solid black !important; padding: 4px; text-align: center; font-size: 10px; }
+            .text-left { text-align: left !important; }
+            .header-info p { margin: 2px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="print-container">
+            ${element.innerHTML}
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const handleDeleteSession = async (sessionId: string) => {
     try {
       await deleteDoc(doc(db, 'classSessions', sessionId));
@@ -513,7 +760,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         const snap = await getDocs(q);
         const data = {
           classId: selectedClass.id,
-          subjectId: selectedSubjectId,
+          subjectId: session.subjectId || selectedSubjectId,
           studentId,
           date: session.date,
           sessionId: session.id,
@@ -534,11 +781,19 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       setFeedback({ message: 'Frequência salva com sucesso!', type: 'success' });
       
       // Refresh monthly attendance
-      const q = query(
-        collection(db, 'attendance'), 
-        where('classId', '==', selectedClass.id),
-        where('subjectId', '==', selectedSubjectId)
-      );
+      let q;
+      if (selectedSubjectId === 'TODAS') {
+        q = query(
+          collection(db, 'attendance'), 
+          where('classId', '==', selectedClass.id)
+        );
+      } else {
+        q = query(
+          collection(db, 'attendance'), 
+          where('classId', '==', selectedClass.id),
+          where('subjectId', '==', selectedSubjectId)
+        );
+      }
       const snap = await getDocs(q);
       setMonthlyAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() as any } as Attendance)));
     } catch (error) {
@@ -549,40 +804,75 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
   const handleSaveGrades = async () => {
     if (!selectedClass) return;
     try {
-      const promises = (Object.entries(grades) as [string, Partial<Grade>][]).map(async ([studentId, gradeData]) => {
-        const q = query(
-          collection(db, 'grades'),
-          where('classId', '==', selectedClass.id),
-          where('subjectId', '==', selectedSubjectId),
-          where('studentId', '==', studentId),
-          where('period', '==', period)
-        );
-        const snap = await getDocs(q);
-        
-        const data = {
-          classId: selectedClass.id,
-          subjectId: selectedSubjectId,
-          studentId,
-          period,
-          teacherId,
-          value: gradeData.value || 0,
-          writtenActivity1: gradeData.writtenActivity1 || 0,
-          writtenActivity2: gradeData.writtenActivity2 || 0,
-          notebookGrade: gradeData.notebookGrade || 0,
-          homeworkGrade: gradeData.homeworkGrade || 0,
-          schoolId: effectiveSchoolId
-        };
+      setLoadingData(true);
+      const effectiveTeacherId = teacherProfile?.id || teacherId;
 
-        if (!snap.empty) {
-          return updateDoc(doc(db, 'grades', snap.docs[0].id), data);
-        } else {
-          return addDoc(collection(db, 'grades'), data);
-        }
-      });
-      await Promise.all(promises);
+      if (selectedClass.educationLevel === 'Ensino Fundamental I') {
+        const promises: any[] = [];
+        Object.entries(consolidatedGrades).forEach(([studentId, subjectGrades]) => {
+          Object.entries(subjectGrades).forEach(([subjectId, gradeData]) => {
+            if (!gradeData || Object.keys(gradeData).length === 0) return;
+            const data = {
+              classId: selectedClass.id,
+              subjectId,
+              studentId,
+              period,
+              teacherId: effectiveTeacherId,
+              value: gradeData.value || 0,
+              writtenActivity1: gradeData.writtenActivity1 || 0,
+              writtenActivity2: gradeData.writtenActivity2 || 0,
+              projectGrade: gradeData.projectGrade || 0,
+              oralActivityGrade: gradeData.oralActivityGrade || 0,
+              notebookGrade: gradeData.notebookGrade || 0,
+              schoolId: effectiveSchoolId
+            };
+
+            if (gradeData.id) {
+              promises.push(updateDoc(doc(db, 'grades', gradeData.id), data));
+            } else {
+              promises.push(addDoc(collection(db, 'grades'), data));
+            }
+          });
+        });
+        await Promise.all(promises);
+      } else {
+        const promises = (Object.entries(grades) as [string, Partial<Grade>][]).map(async ([studentId, gradeData]) => {
+          const q = query(
+            collection(db, 'grades'),
+            where('classId', '==', selectedClass.id),
+            where('subjectId', '==', selectedSubjectId),
+            where('studentId', '==', studentId),
+            where('period', '==', period)
+          );
+          const snap = await getDocs(q);
+          
+          const data = {
+            classId: selectedClass.id,
+            subjectId: selectedSubjectId,
+            studentId,
+            period,
+            teacherId: effectiveTeacherId,
+            value: gradeData.value || 0,
+            writtenActivity1: gradeData.writtenActivity1 || 0,
+            writtenActivity2: gradeData.writtenActivity2 || 0,
+            notebookGrade: gradeData.notebookGrade || 0,
+            homeworkGrade: gradeData.homeworkGrade || 0,
+            schoolId: effectiveSchoolId
+          };
+
+          if (!snap.empty) {
+            return updateDoc(doc(db, 'grades', snap.docs[0].id), data);
+          } else {
+            return addDoc(collection(db, 'grades'), data);
+          }
+        });
+        await Promise.all(promises);
+      }
       setFeedback({ message: 'Notas salvas com sucesso!', type: 'success' });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'grades');
+    } finally {
+      setLoadingData(false);
     }
   };
 
@@ -661,6 +951,23 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                       className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500"
                     />
                   </div>
+                  {selectedSubjectId === 'TODAS' && (
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase">Disciplina</label>
+                      <select 
+                        value={newSessionSubjectId}
+                        onChange={e => setNewSessionSubjectId(e.target.value)}
+                        className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500"
+                      >
+                        <option value="">Selecione...</option>
+                        {subjects.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {selectedClass?.educationLevel !== 'Ensino Fundamental I' && (
+                    <>
                       <div className="space-y-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase">Aula do Dia</label>
                         <select 
@@ -669,7 +976,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                           className="w-full px-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500"
                         >
                           {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
-                            <option key={n} value={n}>{n}ª Aula</option>
+                            <option key={n} value={n}>{n}</option>
                           ))}
                         </select>
                       </div>
@@ -685,6 +992,8 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                           <option value="E">Estadia (E)</option>
                         </select>
                       </div>
+                    </>
+                  )}
                 </div>
                 <textarea
                   placeholder="Conteúdo da aula..."
@@ -708,9 +1017,11 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                     <div>
                       <p className="font-bold text-slate-700">
                         {new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                        <span className="ml-2 text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500">
-                          {s.lessonNumber}ª Aula
-                        </span>
+                        {selectedClass?.educationLevel !== 'Ensino Fundamental I' && (
+                          <span className="ml-2 text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500">
+                            {s.lessonNumber}
+                          </span>
+                        )}
                         {s.specialType && (
                           <span className={`ml-2 text-[10px] px-2 py-0.5 rounded font-bold ${
                             s.specialType === 'C' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
@@ -803,10 +1114,16 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                 onChange={e => setSelectedSubjectId(e.target.value)}
                 className="font-bold text-slate-700 bg-transparent border-none p-0 outline-none cursor-pointer hover:text-emerald-600 transition-colors"
               >
-                <option value="">Selecione...</option>
-                {subjects.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
+                {selectedClass?.educationLevel === 'Ensino Fundamental I' && mode !== 'grades' ? (
+                  <option value="TODAS">TODAS</option>
+                ) : (
+                  <>
+                    <option value="">Selecione...</option>
+                    {subjects.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
           </div>
@@ -875,6 +1192,17 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                     </button>
                   </div>
 
+                  {mode === 'grades' && selectedClass?.educationLevel === 'Ensino Fundamental I' && (
+                    <button
+                      onClick={initializeEF1Subjects}
+                      className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
+                      title="Inicializar Disciplinas do Ensino Fundamental I"
+                    >
+                      <Plus size={16} />
+                      Inicializar Disciplinas
+                    </button>
+                  )}
+
                   {mode !== 'occurrences' && (
                     <select 
                       value={period}
@@ -888,6 +1216,16 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                     </select>
                   )}
                 </div>
+
+                {mode === 'grades' && (
+                  <button
+                    onClick={handlePrintGrades}
+                    className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-sm"
+                  >
+                    <Printer size={18} />
+                    <span className="text-sm">Imprimir Ficha de Notas</span>
+                  </button>
+                )}
                 
                 {mode === 'attendance' && (
                     <div className="flex items-center gap-4">
@@ -901,7 +1239,9 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                           <option value="">Selecione a Aula...</option>
                           {sessions.filter(s => (s as any).period === period).map(s => (
                             <option key={s.id} value={s.id}>
-                              {new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')} - {s.lessonNumber}ª Aula {s.specialType ? `(${s.specialType === 'C' ? 'Contra Turno' : 'Estadia'})` : ''}
+                              {new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')} 
+                              {selectedClass?.educationLevel !== 'Ensino Fundamental I' && ` - ${s.lessonNumber}`}
+                              {s.specialType ? ` (${s.specialType === 'C' ? 'Contra Turno' : 'Estadia'})` : ''}
                             </option>
                           ))}
                         </select>
@@ -977,7 +1317,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <select id="occ-student" className="px-4 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
                         <option value="">Selecione o Aluno...</option>
-                        {students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+                        {students.filter(s => s.status !== 'transferred').map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
                       </select>
                       <select id="occ-type" className="px-4 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
                         <option>Indisciplina</option>
@@ -1007,45 +1347,89 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                   </div>
                 )}
 
-                <table className="w-full text-left">
-                  <thead key={`thead-${mode}`} className="bg-slate-50/50 border-b border-slate-100">
-                    <tr>
-                      <th className="px-6 py-4 text-sm font-semibold text-slate-600">
-                        <div className="flex items-center gap-2">
-                          <span>Aluno</span>
-                          {(() => {
-                            const session = sessions.find(s => s.id === selectedSessionId);
-                            if (session?.specialType) {
-                              return (
-                                <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${
-                                  session.specialType === 'C' 
-                                    ? 'bg-orange-100 text-orange-700 border-orange-200' 
-                                    : 'bg-blue-100 text-blue-700 border-blue-200'
-                                }`}>
-                                  {session.specialType === 'C' ? 'CONTRA TURNO' : 'ESTADIA'}
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
-                      </th>
-                      <th className={`px-6 py-4 text-sm font-semibold text-slate-600 text-center ${mode === 'grades' ? 'w-[400px]' : mode === 'attendance' ? 'w-64' : 'w-32'}`}>
-                        {mode === 'attendance' ? <span>Presença</span> : mode === 'grades' ? (
-                          <div className="grid grid-cols-5 gap-2 text-[10px] uppercase font-bold">
-                            <span title="Atividade Escrita 1">Escrita 1</span>
-                            <span title="Atividade Escrita 2">Escrita 2</span>
-                            <span title="Nota do Caderno">Caderno</span>
-                            <span title="Tarefa de Casa">Tarefa</span>
-                            <span title="Nota Total">Total</span>
-                          </div>
-                        ) : <span>Tipo</span>}
-                      </th>
-                      {mode === 'attendance' && <th className="px-6 py-4 text-sm font-semibold text-slate-600"><span>Observações</span></th>}
-                      {mode === 'occurrences' && <th className="px-6 py-4 text-sm font-semibold text-slate-600"><span>Descrição</span></th>}
-                      {mode === 'occurrences' && <th className="px-6 py-4 text-sm font-semibold text-slate-600 w-20"><span>Ações</span></th>}
-                    </tr>
-                  </thead>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left min-w-max border-collapse">
+                    {subjects.length === 0 && mode === 'grades' && selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
+                    <tbody>
+                      <tr>
+                        <td colSpan={3} className="p-12 text-center">
+                          <AlertCircle size={48} className="mx-auto text-slate-300 mb-4" />
+                          <p className="text-slate-500 font-medium">Nenhuma disciplina cadastrada para esta turma.</p>
+                          <button
+                            onClick={initializeEF1Subjects}
+                            className="mt-4 px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-colors"
+                          >
+                            Inicializar Disciplinas EF1
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  ) : (
+                    <>
+                      <thead key={`thead-${mode}`} className="bg-slate-50/50 border-b border-slate-100">
+                        {mode === 'grades' && selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
+                          <>
+                            <tr>
+                              <th rowSpan={2} className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider border border-slate-200 bg-slate-50">Nº</th>
+                              <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider border border-slate-200 sticky left-0 bg-slate-50 z-20 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Estudante</th>
+                              {subjects.map(subject => (
+                                <th key={`subject-header-${subject.id}`} colSpan={6} className="px-2 py-2 text-center text-[10px] font-black text-white uppercase tracking-tighter border border-slate-300 bg-emerald-600">
+                                  {subject.name}
+                                </th>
+                              ))}
+                            </tr>
+                            <tr>
+                              {subjects.map(subject => (
+                                <Fragment key={`sub-header-${subject.id}`}>
+                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]">E1</th>
+                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]">E2</th>
+                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]">PRJ</th>
+                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]">ATIV</th>
+                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]">CAD</th>
+                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-emerald-700 uppercase border border-slate-200 bg-emerald-50 min-w-[40px]">TOT</th>
+                                </Fragment>
+                              ))}
+                            </tr>
+                          </>
+                        ) : (
+                          <tr>
+                            <th className="px-6 py-4 text-sm font-semibold text-slate-600">
+                              <div className="flex items-center gap-2">
+                                <span>Aluno</span>
+                                {(() => {
+                                  const session = sessions.find(s => s.id === selectedSessionId);
+                                  if (session?.specialType) {
+                                    return (
+                                      <span className={`text-[10px] font-black px-2 py-0.5 rounded border ${
+                                        session.specialType === 'C' 
+                                          ? 'bg-orange-100 text-orange-700 border-orange-200' 
+                                          : 'bg-blue-100 text-blue-700 border-blue-200'
+                                      }`}>
+                                        {session.specialType === 'C' ? 'CONTRA TURNO' : 'ESTADIA'}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
+                            </th>
+                            <th className={`px-6 py-4 text-sm font-semibold text-slate-600 text-center ${mode === 'grades' ? 'w-[400px]' : mode === 'attendance' ? 'w-64' : 'w-32'}`}>
+                              {mode === 'attendance' ? <span>Presença</span> : mode === 'grades' ? (
+                                <div className="grid grid-cols-5 gap-2 text-[10px] uppercase font-bold">
+                                  <span title="Atividade Escrita 1">Escrita 1</span>
+                                  <span title="Atividade Escrita 2">Escrita 2</span>
+                                  <span title="Nota do Caderno">Caderno</span>
+                                  <span title="Tarefa de Casa">Tarefa</span>
+                                  <span title="Nota Total">Total</span>
+                                </div>
+                              ) : <span>Tipo</span>}
+                            </th>
+                            {mode === 'attendance' && <th className="px-6 py-4 text-sm font-semibold text-slate-600"><span>Observações</span></th>}
+                            {mode === 'occurrences' && <th className="px-6 py-4 text-sm font-semibold text-slate-600"><span>Descrição</span></th>}
+                            {mode === 'occurrences' && <th className="px-6 py-4 text-sm font-semibold text-slate-600 w-20"><span>Ações</span></th>}
+                          </tr>
+                        )}
+                      </thead>
                   <tbody key={`tbody-${mode}-${selectedClass?.id}`} className="divide-y divide-slate-100">
                     {mode === 'occurrences' ? (
                       occurrences.sort((a, b) => b.date.localeCompare(a.date)).map(occ => {
@@ -1075,27 +1459,119 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                           </tr>
                         );
                       })
-                    ) : students.map(student => {
+                    ) : students.map((student, idx) => {
                       const studentName = student.name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Sem Nome';
+                      const session = sessions.find(s => s.id === selectedSessionId);
+                      const isTransferred = student.status === 'transferred' && (!student.transferDate || (session && session.date >= student.transferDate));
+                      
+                      if (mode === 'grades' && selectedClass?.educationLevel === 'Ensino Fundamental I') {
+                        return (
+                          <tr key={`student-row-${student.id}`} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-2 text-xs font-bold text-slate-500 border border-slate-200 text-center">{idx + 1}</td>
+                            <td className="px-4 py-2 text-xs font-medium text-slate-900 border border-slate-200 sticky left-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
+                              {studentName}
+                            </td>
+                            {subjects.map(subject => {
+                              const grade = consolidatedGrades[student.id]?.[subject.id] || {};
+                              return (
+                                <Fragment key={`${student.id}-${subject.id}`}>
+                                  <td className="p-0 border border-slate-200">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="10"
+                                      step="0.1"
+                                      className="w-full h-10 px-1 text-center text-xs outline-none focus:bg-emerald-50 disabled:bg-slate-50 disabled:text-slate-400"
+                                      value={grade.writtenActivity1 || ''}
+                                      disabled={isTransferred}
+                                      onChange={e => updateGrade(student.id, 'writtenActivity1', e.target.value, subject.id)}
+                                    />
+                                  </td>
+                                  <td className="p-0 border border-slate-200">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="10"
+                                      step="0.1"
+                                      className="w-full h-10 px-1 text-center text-xs outline-none focus:bg-emerald-50 disabled:bg-slate-50 disabled:text-slate-400"
+                                      value={grade.writtenActivity2 || ''}
+                                      disabled={isTransferred}
+                                      onChange={e => updateGrade(student.id, 'writtenActivity2', e.target.value, subject.id)}
+                                    />
+                                  </td>
+                                  <td className="p-0 border border-slate-200">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="10"
+                                      step="0.1"
+                                      className="w-full h-10 px-1 text-center text-xs outline-none focus:bg-emerald-50 disabled:bg-slate-50 disabled:text-slate-400"
+                                      value={grade.projectGrade || ''}
+                                      disabled={isTransferred}
+                                      onChange={e => updateGrade(student.id, 'projectGrade', e.target.value, subject.id)}
+                                    />
+                                  </td>
+                                  <td className="p-0 border border-slate-200">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="10"
+                                      step="0.1"
+                                      className="w-full h-10 px-1 text-center text-xs outline-none focus:bg-emerald-50 disabled:bg-slate-50 disabled:text-slate-400"
+                                      value={grade.oralActivityGrade || ''}
+                                      disabled={isTransferred}
+                                      onChange={e => updateGrade(student.id, 'oralActivityGrade', e.target.value, subject.id)}
+                                    />
+                                  </td>
+                                  <td className="p-0 border border-slate-200">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="10"
+                                      step="0.1"
+                                      className="w-full h-10 px-1 text-center text-xs outline-none focus:bg-emerald-50 disabled:bg-slate-50 disabled:text-slate-400"
+                                      value={grade.notebookGrade || ''}
+                                      disabled={isTransferred}
+                                      onChange={e => updateGrade(student.id, 'notebookGrade', e.target.value, subject.id)}
+                                    />
+                                  </td>
+                                  <td className="px-1 py-2 text-center text-xs font-bold bg-slate-100 border border-slate-200">
+                                    {grade.value?.toFixed(1) || '0.0'}
+                                  </td>
+                                </Fragment>
+                              );
+                            })}
+                          </tr>
+                        );
+                      }
+
                       return (
                         <tr key={`student-row-${student.id}`}>
                           <td className="px-6 py-4 font-medium text-slate-900"><span>{studentName}</span></td>
                           <td className="px-6 py-4">
                           {mode === 'attendance' ? (
-                            <div className="flex justify-center gap-4">
-                              <button
-                                onClick={() => setAttendance({ ...attendance, [student.id]: 'present' })}
-                                className={`p-2 rounded-full transition-all ${attendance[student.id] === 'present' ? 'bg-emerald-100 text-emerald-600' : 'text-slate-300 hover:bg-slate-50'}`}
-                              >
-                                <Check size={20} />
-                              </button>
-                              <button
-                                onClick={() => setAttendance({ ...attendance, [student.id]: 'absent' })}
-                                className={`p-2 rounded-full transition-all ${attendance[student.id] === 'absent' ? 'bg-red-100 text-red-600' : 'text-slate-300 hover:bg-slate-50'}`}
-                              >
-                                <X size={20} />
-                              </button>
-                            </div>
+                            isTransferred ? (
+                              <div className="flex justify-center">
+                                <span className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 font-bold border border-slate-200" title="Transferido">
+                                  T
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex justify-center gap-4">
+                                <button
+                                  onClick={() => setAttendance({ ...attendance, [student.id]: 'present' })}
+                                  className={`p-2 rounded-full transition-all ${attendance[student.id] === 'present' ? 'bg-emerald-100 text-emerald-600' : 'text-slate-300 hover:bg-slate-50'}`}
+                                >
+                                  <Check size={20} />
+                                </button>
+                                <button
+                                  onClick={() => setAttendance({ ...attendance, [student.id]: 'absent' })}
+                                  className={`p-2 rounded-full transition-all ${attendance[student.id] === 'absent' ? 'bg-red-100 text-red-600' : 'text-slate-300 hover:bg-slate-50'}`}
+                                >
+                                  <X size={20} />
+                                </button>
+                              </div>
+                            )
                           ) : (
                             <div className="flex justify-center">
                               <div className="grid grid-cols-5 gap-2">
@@ -1105,7 +1581,8 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                   max="10"
                                   step="0.1"
                                   placeholder="E1"
-                                  className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                                  disabled={isTransferred}
+                                  className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
                                   value={grades[student.id]?.writtenActivity1 || ''}
                                   onChange={e => updateGrade(student.id, 'writtenActivity1', e.target.value)}
                                 />
@@ -1115,7 +1592,8 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                   max="10"
                                   step="0.1"
                                   placeholder="E2"
-                                  className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                                  disabled={isTransferred}
+                                  className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
                                   value={grades[student.id]?.writtenActivity2 || ''}
                                   onChange={e => updateGrade(student.id, 'writtenActivity2', e.target.value)}
                                 />
@@ -1125,7 +1603,8 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                   max="10"
                                   step="0.1"
                                   placeholder="CAD"
-                                  className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                                  disabled={isTransferred}
+                                  className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
                                   value={grades[student.id]?.notebookGrade || ''}
                                   onChange={e => updateGrade(student.id, 'notebookGrade', e.target.value)}
                                 />
@@ -1135,7 +1614,8 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                   max="10"
                                   step="0.1"
                                   placeholder="TAR"
-                                  className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+                                  disabled={isTransferred}
+                                  className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
                                   value={grades[student.id]?.homeworkGrade || ''}
                                   onChange={e => updateGrade(student.id, 'homeworkGrade', e.target.value)}
                                 />
@@ -1150,10 +1630,11 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                           <td className="px-6 py-4">
                             <input 
                               type="text"
-                              value={attendanceObs[student.id] || ''}
+                              value={isTransferred ? 'TRANSFERIDO' : (attendanceObs[student.id] || '')}
                               onChange={e => setAttendanceObs({ ...attendanceObs, [student.id]: e.target.value })}
                               placeholder="Observação..."
-                              className="w-full px-3 py-1 rounded border border-slate-200 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                              disabled={isTransferred}
+                              className={`w-full px-3 py-1 rounded border border-slate-200 text-xs outline-none focus:ring-1 focus:ring-emerald-500 ${isTransferred ? 'bg-slate-50 text-slate-400 italic' : ''}`}
                             />
                           </td>
                         )}
@@ -1161,11 +1642,23 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                     );
                   })}
                 </tbody>
+                </>
+                )}
                 </table>
               </div>
+            </div>
 
-              {mode !== 'occurrences' && (
-                <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end">
+            {mode !== 'occurrences' && (
+                <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-4">
+                  {mode === 'grades' && (
+                    <button
+                      onClick={handlePrintGrades}
+                      className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-6 py-3 rounded-xl font-bold transition-all shadow-sm"
+                    >
+                      <Printer size={20} />
+                      Imprimir Ficha de Notas
+                    </button>
+                  )}
                   <button
                     onClick={mode === 'attendance' ? handleSaveAttendance : handleSaveGrades}
                     className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md"
@@ -1194,6 +1687,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
 
         const monthName = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'][selectedReportMonth - 1];
 
+        const totalWorkload = subjects.reduce((acc, s) => acc + (s.workload || 0), 0);
         const currentSubject = subjects.find(s => s.id === selectedSubjectId);
         const currentTeacherName = (() => {
           if (currentSubject?.teacherId) {
@@ -1220,11 +1714,17 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                       />
                       <div>
                         <p>{selectedClass?.educationLevel ? selectedClass.educationLevel.toUpperCase() : 'ENSINO FUNDAMENTAL'}</p>
-                        <p>ESCOLA: {school?.name || '---'}</p>
+                        <p className="text-[10px] font-black">ESCOLA: {school?.name || '---'}</p>
+                        <div className="text-[7px] font-normal leading-tight">
+                          <p>{school?.address || ''}</p>
+                          {school?.creationDecree && <p>DECRETO: {school.creationDecree}</p>}
+                          {school?.authorization && <p>AUTORIZAÇÃO/PARECER: {school.authorization}</p>}
+                          {school?.resolution && <p>RESOLUÇÃO: {school.resolution}</p>}
+                        </div>
                       </div>
                     </div>
                     <p>PROFESSOR/A: {currentTeacherName}</p>
-                    <p>DISCIPLINA: {currentSubject?.name || '---'}</p>
+                    <p>DISCIPLINA: {selectedSubjectId === 'TODAS' ? 'TODAS AS DISCIPLINAS' : (currentSubject?.name || '---')}</p>
                   </div>
                   {selectedClass?.educationLevel === 'Ensino Fundamental II' ? (
                     <>
@@ -1300,21 +1800,26 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                       (!a.subjectId || a.subjectId === selectedSubjectId) &&
                       filteredSessions.some(s => s.id === a.sessionId)
                     ).length;
+                    
+                    const isCurrentlyTransferred = student.status === 'transferred';
+
                     return (
                       <tr key={student.id}>
                         <td className="border border-slate-900 p-0.5 text-center">{idx + 1}</td>
-                        <td className="border border-slate-900 p-0.5 uppercase font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px]">
+                        <td className={`border border-slate-900 p-0.5 uppercase font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] ${isCurrentlyTransferred ? 'text-slate-400 line-through' : ''}`}>
                           {((student as any).name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Sem Nome').substring(0, 30)}
                         </td>
                         {Array.from({ length: 31 }, (_, i) => filteredSessions[i] || null).map((s, i) => {
                           if (s) {
+                            const isTransferredAtSession = student.status === 'transferred' && (!student.transferDate || s.date >= student.transferDate);
+                            
                             const record = monthlyAttendance.find(a => 
                               a.studentId === student.id && 
                               a.sessionId === s.id
                             );
                             return (
-                              <td key={s.id} className="border border-slate-900 p-0.5 text-center font-bold">
-                                {record ? (record.status === 'present' ? '.' : 'F') : '.'}
+                              <td key={s.id} className={`border border-slate-900 p-0.5 text-center font-bold ${isTransferredAtSession ? 'text-red-600 bg-red-50' : ''}`}>
+                                {isTransferredAtSession ? 'T' : (record ? (record.status === 'present' ? '.' : 'F') : '.')}
                               </td>
                             );
                           }
@@ -1358,29 +1863,126 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             </div>
           </div>
 
+          <div ref={printGradesRef} className="hidden print:block bg-white p-0 text-slate-900 w-full">
+            <div className="p-4">
+              <div className="flex items-center gap-4 mb-6 border-b-2 border-slate-900 pb-4">
+                <img 
+                  src={school?.logoUrl || 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Bras%C3%A3o_de_Ji-Paran%C3%A1.png/200px-Bras%C3%A3o_de_Ji-Paran%C3%A1.png'} 
+                  alt={school?.name || 'Brasão'} 
+                  className="h-16 w-auto object-contain"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="header-info">
+                  <h1 className="text-xl font-black uppercase">{school?.name || '---'}</h1>
+                  <p className="text-sm font-bold uppercase">{selectedClass?.educationLevel || 'ENSINO FUNDAMENTAL'}</p>
+                  <div className="text-[10px] mt-1">
+                    <p>TURMA: {selectedClass?.name} ({selectedClass?.grade}) - TURNO: {selectedClass?.shift}</p>
+                    <p>DISCIPLINA: {subjects.find(s => s.id === selectedSubjectId)?.name || '---'}</p>
+                    <p>PROFESSOR(A): {currentTeacherName}</p>
+                    <p className="font-bold mt-1">{period.toUpperCase()}</p>
+                  </div>
+                </div>
+              </div>
+
+              <h2 className="text-center text-lg font-black uppercase mb-4">Ficha de Notas</h2>
+
+              <table className="w-full border-collapse border border-slate-900 text-[10px]">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="border border-slate-900 p-2 text-left w-10">Nº</th>
+                    <th className="border border-slate-900 p-2 text-left">ALUNO</th>
+                    <th className="border border-slate-900 p-2 w-16">ESCRITA 1</th>
+                    <th className="border border-slate-900 p-2 w-16">ESCRITA 2</th>
+                    {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
+                      <>
+                        <th className="border border-slate-900 p-2 w-16">PROJETO</th>
+                        <th className="border border-slate-900 p-2 w-16">ATIV. ORAL</th>
+                        <th className="border border-slate-900 p-2 w-16">CADERNO</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="border border-slate-900 p-2 w-16">CADERNO</th>
+                        <th className="border border-slate-900 p-2 w-16">TAREFA</th>
+                      </>
+                    )}
+                    <th className="border border-slate-900 p-2 w-16">TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((student, idx) => {
+                    const grade = selectedClass?.educationLevel === 'Ensino Fundamental I' 
+                      ? (consolidatedGrades[student.id]?.[selectedSubjectId] || {})
+                      : (grades[student.id] || {});
+                    
+                    return (
+                      <tr key={student.id}>
+                        <td className="border border-slate-900 p-2 text-center">{idx + 1}</td>
+                        <td className="border border-slate-900 p-2 text-left uppercase font-medium">
+                          {(student as any).name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Sem Nome'}
+                        </td>
+                        <td className="border border-slate-900 p-2">{grade.writtenActivity1 !== undefined ? grade.writtenActivity1.toFixed(1) : '-'}</td>
+                        <td className="border border-slate-900 p-2">{grade.writtenActivity2 !== undefined ? grade.writtenActivity2.toFixed(1) : '-'}</td>
+                        {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
+                          <>
+                            <td className="border border-slate-900 p-2">{grade.projectGrade !== undefined ? grade.projectGrade.toFixed(1) : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.oralActivityGrade !== undefined ? grade.oralActivityGrade.toFixed(1) : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.notebookGrade !== undefined ? grade.notebookGrade.toFixed(1) : '-'}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="border border-slate-900 p-2">{grade.notebookGrade !== undefined ? grade.notebookGrade.toFixed(1) : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.homeworkGrade !== undefined ? grade.homeworkGrade.toFixed(1) : '-'}</td>
+                          </>
+                        )}
+                        <td className="border border-slate-900 p-2 font-bold">{grade.value !== undefined ? grade.value.toFixed(1) : '0.0'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div className="mt-12 flex justify-between items-end px-8">
+                <div className="text-center">
+                  <div className="w-64 border-t border-slate-900 mb-1"></div>
+                  <p className="text-sm">{currentTeacherName}</p>
+                  <p className="text-[10px] font-bold uppercase">Professor (a)</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm mb-12">Ji-Paraná, {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                  <div className="w-64 border-t border-slate-900 mb-1"></div>
+                  <p className="text-[10px] font-bold uppercase">Direção / Coordenação</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Page 2: Content */}
           <div className="min-h-screen p-4 mt-8">
             <div className="border-2 border-slate-900 p-2">
               <div className="text-center mb-4 border-b border-slate-900 pb-2">
                 <h2 className="text-sm font-black uppercase">Registro de Conteúdos Ministrados</h2>
-                <p className="text-[10px] uppercase">Ano Letivo {school?.schoolYear || '---'} - {selectedClass?.name} - {subjects.find(s => s.id === selectedSubjectId)?.name}</p>
+                <p className="text-[10px] uppercase">Ano Letivo {school?.schoolYear || '---'} - {selectedClass?.name} - {selectedSubjectId === 'TODAS' ? 'TODAS AS DISCIPLINAS' : subjects.find(s => s.id === selectedSubjectId)?.name}</p>
                 <p className="text-[10px] font-bold uppercase mt-1">{getPeriodText()}</p>
               </div>
 
               <table className="w-full border-collapse border border-slate-900 text-[10px]">
                 <thead>
                   <tr className="bg-slate-50">
-                    <th className="border border-slate-900 p-2 text-left w-24">DATA</th>
+                    <th className="border border-slate-900 p-2 text-left w-24" rowSpan={selectedClass?.educationLevel === 'Ensino Fundamental II' ? 2 : 1}>DATA</th>
                     {selectedClass?.educationLevel === 'Ensino Fundamental II' && (
-                      <th className="border border-slate-900 p-2 text-center w-16">TIPO</th>
+                      <th className="border border-slate-900 p-1 text-center" colSpan={1}>DETALHES</th>
                     )}
-                    <th className="border border-slate-900 p-2 text-center w-16">AULA</th>
-                    <th className="border border-slate-900 p-2 text-left">
+                    <th className="border border-slate-900 p-2 text-center" rowSpan={selectedClass?.educationLevel === 'Ensino Fundamental II' ? 2 : 1}>
                       {(selectedClass?.educationLevel === 'Educação Infantil' || selectedClass?.educationLevel === 'Creche') 
                         ? 'OBJETO DE APRENDIZAGEM E DESENVOLVIMENTO' 
                         : 'OBJETO DO CONHECIMENTO / CONTEÚDO'}
                     </th>
                   </tr>
+                  {selectedClass?.educationLevel === 'Ensino Fundamental II' && (
+                    <tr className="bg-slate-50">
+                      <th className="border border-slate-900 p-1 text-center w-16 text-[8px]">TIPO</th>
+                    </tr>
+                  )}
                 </thead>
                 <tbody>
                   {filteredSessions.map(s => {
@@ -1388,13 +1990,14 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                       <tr key={s.id}>
                         <td className="border border-slate-900 p-2 font-bold">{new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')}</td>
                         {selectedClass?.educationLevel === 'Ensino Fundamental II' && (
-                          <td className={`border border-slate-900 p-2 text-center font-black text-[10px] ${
-                            s.specialType === 'C' ? 'bg-orange-50' : s.specialType === 'E' ? 'bg-blue-50' : ''
-                          }`}>
-                            {s.specialType || '-'}
-                          </td>
+                          <>
+                            <td className={`border border-slate-900 p-2 text-center font-black text-[10px] ${
+                              s.specialType === 'C' ? 'bg-orange-50' : s.specialType === 'E' ? 'bg-blue-50' : ''
+                            }`}>
+                              {s.specialType || '-'}
+                            </td>
+                          </>
                         )}
-                        <td className="border border-slate-900 p-2 text-center">{s.lessonNumber}ª</td>
                         <td className="border border-slate-900 p-2 italic">{s.description || '---'}</td>
                       </tr>
                     );
