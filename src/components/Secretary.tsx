@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, getDocs, deleteDoc, doc, getDoc, updateDoc, writeBatch, setDoc, query, where, limit } from 'firebase/firestore';
 import { Student, Staff, Class, StaffRole, ClassShift, UserProfile, UserRole, Subject } from '../types';
-import { Plus, Trash2, Edit2, Search, UserPlus, BookPlus, GraduationCap, FileUp, Download, X, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Edit2, Search, UserPlus, BookPlus, GraduationCap, FileUp, Download, X, ShieldCheck, AlertCircle, Database, RefreshCw, Upload, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Papa from 'papaparse';
 import { handleFirestoreError, OperationType } from '../utils/errorHandling';
@@ -26,7 +26,7 @@ interface SecretaryProps {
 }
 
 export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'students' | 'teachers' | 'staff' | 'classes' | 'users' | 'school'>('students');
+  const [activeSubTab, setActiveSubTab] = useState<'students' | 'teachers' | 'staff' | 'classes' | 'users' | 'school' | 'backup'>('students');
   const [students, setStudents] = useState<Student[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -40,6 +40,7 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
   const [showConfirmModal, setShowConfirmModal] = useState<{ show: boolean, id: string, type: string } | null>(null);
   const [feedback, setFeedback] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<any>({ address: {} });
   const [importing, setImporting] = useState(false);
@@ -225,7 +226,7 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                 birthPlace: row.birthPlace || '',
                 contact: row.contact || '',
                 registrationNumber: row.registrationNumber,
-                status: 'active',
+                status: row.status || 'active',
                 schoolId,
                 address: {
                   street: row.street || '',
@@ -238,7 +239,10 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                 guardianLastName: row.guardianLastName || '',
                 guardianCpf: row.guardianCpf || '',
                 guardianRg: row.guardianRg || '',
-                guardianContact: row.guardianContact || ''
+                guardianContact: row.guardianContact || '',
+                fatherName: row.fatherName || '',
+                motherName: row.motherName || '',
+                studentNumber: row.studentNumber || ''
               });
             }
           });
@@ -258,10 +262,11 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
   const downloadTemplate = () => {
     const headers = [
       "firstName", "lastName", "cpf", "rg", "birthDate", "birthPlace", "contact", 
-      "registrationNumber", "street", "number", "neighborhood", "city", "cep",
-      "guardianFirstName", "guardianLastName", "guardianCpf", "guardianRg", "guardianContact"
+      "registrationNumber", "studentNumber", "street", "number", "neighborhood", "city", "cep",
+      "guardianFirstName", "guardianLastName", "guardianCpf", "guardianRg", "guardianContact",
+      "fatherName", "motherName", "status"
     ];
-    const csvContent = headers.join(",") + "\nJoão,Silva,123.456.789-00,12.345.678-9,2010-05-15,São Paulo,(11) 99999-9999,2024001,Rua das Flores,123,Centro,São Paulo,01001-000,Maria,Silva,987.654.321-00,98.765.432-1,(11) 88888-8888";
+    const csvContent = headers.join(",") + "\nJoão,Silva,123.456.789-00,12.345.678-9,2010-05-15,São Paulo,(11) 99999-9999,2024001,1,Rua das Flores,123,Centro,São Paulo,01001-000,Maria,Silva,987.654.321-00,98.765.432-1,(11) 88888-8888,José Silva,Maria Silva,active";
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
@@ -327,6 +332,327 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
     }
   };
 
+  const handleExportBackup = async () => {
+    try {
+      setFeedback({ message: 'Preparando backup...', type: 'success' });
+      const collectionsToBackup = [
+        'students', 'staff', 'classes', 'subjects', 'grades', 
+        'attendance', 'occurrences', 'classSessions', 'classSchedules', 'users'
+      ];
+      
+      const backupData: any = {
+        schoolId,
+        exportDate: new Date().toISOString(),
+        type: 'school',
+        collections: {}
+      };
+
+      // Backup school data
+      const schoolSnap = await getDoc(doc(db, 'schools', schoolId));
+      if (schoolSnap.exists()) {
+        backupData.school = { id: schoolSnap.id, ...schoolSnap.data() };
+      }
+
+      // Backup other collections
+      for (const colName of collectionsToBackup) {
+        const q = query(collection(db, colName), where('schoolId', '==', schoolId));
+        const snap = await getDocs(q);
+        backupData.collections[colName] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `backup_escolar_${school?.name?.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setFeedback({ message: 'Backup concluído com sucesso!', type: 'success' });
+    } catch (error) {
+      console.error("Backup error:", error);
+      setFeedback({ message: 'Erro ao gerar backup.', type: 'error' });
+    }
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const backupData = JSON.parse(event.target?.result as string);
+        
+        if (!backupData.collections || typeof backupData.collections !== 'object') {
+          throw new Error('Formato de backup inválido.');
+        }
+
+        if (backupData.type === 'global') {
+          throw new Error('Este é um backup global. Use o Painel SuperAdmin para restaurá-lo.');
+        }
+
+        if (backupData.schoolId !== schoolId && !window.confirm('Este backup parece ser de outra escola. Deseja continuar a restauração nesta escola atual?')) {
+          return;
+        }
+
+        setImporting(true);
+        setFeedback({ message: 'Restaurando dados...', type: 'success' });
+
+        let batch = writeBatch(db);
+        let operationCount = 0;
+
+        // Restore school data if present
+        if (backupData.school) {
+          const { id, ...data } = backupData.school;
+          batch.set(doc(db, 'schools', schoolId), data, { merge: true });
+          operationCount++;
+        }
+
+        // Restore collections
+        for (const [colName, docs] of Object.entries(backupData.collections)) {
+          const documents = docs as any[];
+          for (const docData of documents) {
+            const { id, ...data } = docData;
+            // Force current schoolId to avoid cross-school data pollution
+            const restoredData = { ...data, schoolId };
+            const docRef = doc(db, colName as string, id);
+            batch.set(docRef, restoredData, { merge: true });
+            operationCount++;
+
+            if (operationCount >= 400) {
+              await batch.commit();
+              batch = writeBatch(db);
+              operationCount = 0;
+            }
+          }
+        }
+
+        if (operationCount > 0) {
+          await batch.commit();
+        }
+
+        setFeedback({ message: 'Restauração concluída com sucesso!', type: 'success' });
+        fetchData();
+      } catch (error) {
+        console.error("Restore error:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Verifique o arquivo.';
+        setFeedback({ message: `Erro ao restaurar backup: ${errorMessage}`, type: 'error' });
+      } finally {
+        setImporting(false);
+        if (e.target) e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handlePrintStudentsByClass = () => {
+    if (classes.length === 0) {
+      setFeedback({ message: 'Nenhuma turma cadastrada para gerar o relatório.', type: 'error' });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setFeedback({ message: 'O bloqueador de pop-ups impediu a abertura do relatório. Por favor, autorize pop-ups para este site.', type: 'error' });
+      return;
+    }
+
+    const studentsByClass: { [key: string]: Student[] } = {};
+    classes.forEach(c => {
+      studentsByClass[c.id] = students.filter(s => s.classId === c.id);
+    });
+
+    let html = `
+      <html>
+        <head>
+          <title>Relatório de Alunos por Turma</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; color: #333; }
+            h1 { text-align: center; color: #1e293b; margin-bottom: 30px; }
+            .class-section { margin-bottom: 40px; page-break-inside: avoid; }
+            .class-header { background: #f1f5f9; padding: 10px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #059669; }
+            .class-name { font-size: 1.2rem; font-weight: bold; margin: 0; }
+            .class-info { font-size: 0.9rem; color: #64748b; margin: 5px 0 0 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; font-size: 0.9rem; }
+            th { background: #f8fafc; font-weight: bold; }
+            .no-students { color: #94a3b8; font-style: italic; padding: 10px; }
+            @media print {
+              .class-section { page-break-after: auto; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório de Alunos por Turma</h1>
+          <p style="text-align: right; font-size: 0.8rem; color: #64748b;">Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+    `;
+
+    [...classes].sort((a, b) => (a.name || '').localeCompare(b.name || '')).forEach(c => {
+      const classStudents = studentsByClass[c.id] || [];
+      html += `
+        <div class="class-section">
+          <div class="class-header">
+            <p class="class-name">${c.name || 'Sem Nome'} - ${c.grade || '---'}</p>
+            <p class="class-info">Turno: ${c.shift || '---'} | Nível: ${c.educationLevel || '---'} | Total: ${classStudents.length} alunos</p>
+          </div>
+          ${classStudents.length > 0 ? `
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 50px;">Nº</th>
+                  <th>Nome do Aluno</th>
+                  <th>Matrícula</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${[...classStudents].sort((a, b) => (a.firstName || '').localeCompare(b.firstName || '')).map((s, idx) => `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td>${s.firstName || ''} ${s.lastName || ''}</td>
+                    <td>${s.registrationNumber || '---'}</td>
+                    <td>${s.status === 'active' ? 'Ativo' : s.status === 'inactive' ? 'Inativo' : 'Transferido'}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          ` : '<p class="no-students">Nenhum aluno matriculado nesta turma.</p>'}
+        </div>
+      `;
+    });
+
+    html += `
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
+
+  const handlePrintStaff = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setFeedback({ message: 'O bloqueador de pop-ups impediu a abertura do relatório. Por favor, autorize pop-ups para este site.', type: 'error' });
+      return;
+    }
+
+    const staffList = staff.filter(s => s.role !== 'Professor');
+
+    let html = `
+      <html>
+        <head>
+          <title>Relatório de Funcionários</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; color: #333; }
+            h1 { text-align: center; color: #1e293b; margin-bottom: 30px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; font-size: 0.85rem; }
+            th { background: #f8fafc; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório de Funcionários</h1>
+          <p style="text-align: right; font-size: 0.8rem; color: #64748b;">Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Cargo</th>
+                <th>CPF</th>
+                <th>RG</th>
+                <th>Contato</th>
+                <th>E-mail</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${[...staffList].sort((a, b) => (a.firstName || '').localeCompare(b.firstName || '')).map(s => `
+                <tr>
+                  <td>${s.firstName || ''} ${s.lastName || ''}</td>
+                  <td>${s.role || '---'}</td>
+                  <td>${s.cpf || '---'}</td>
+                  <td>${s.rg || '---'}</td>
+                  <td>${s.contact || '---'}</td>
+                  <td>${s.email || '---'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
+
+  const handlePrintTeachers = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setFeedback({ message: 'O bloqueador de pop-ups impediu a abertura do relatório. Por favor, autorize pop-ups para este site.', type: 'error' });
+      return;
+    }
+
+    const teachersList = staff.filter(s => s.role === 'Professor');
+
+    let html = `
+      <html>
+        <head>
+          <title>Relatório de Professores</title>
+          <style>
+            body { font-family: sans-serif; padding: 20px; color: #333; }
+            h1 { text-align: center; color: #1e293b; margin-bottom: 30px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; font-size: 0.85rem; }
+            th { background: #f8fafc; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório de Professores</h1>
+          <p style="text-align: right; font-size: 0.8rem; color: #64748b;">Gerado em: ${new Date().toLocaleString('pt-BR')}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>CPF</th>
+                <th>RG</th>
+                <th>Contato</th>
+                <th>E-mail</th>
+                <th>Disciplinas</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${[...teachersList].sort((a, b) => (a.firstName || '').localeCompare(b.firstName || '')).map(s => `
+                <tr>
+                  <td>${s.firstName || ''} ${s.lastName || ''}</td>
+                  <td>${s.cpf || '---'}</td>
+                  <td>${s.rg || '---'}</td>
+                  <td>${s.contact || '---'}</td>
+                  <td>${s.email || '---'}</td>
+                  <td>${s.subjects?.join(', ') || '---'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+  };
+
   return (
     <div className="p-8">
       <header className="flex justify-between items-center mb-8">
@@ -361,6 +687,36 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                 className="hidden"
               />
             </>
+          )}
+          {activeSubTab === 'classes' && (
+            <button
+              onClick={handlePrintStudentsByClass}
+              className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-3 rounded-xl font-semibold transition-all shadow-sm"
+              title="Imprimir Relatório de Alunos por Turma"
+            >
+              <Printer size={20} />
+              Imprimir Relatório
+            </button>
+          )}
+          {activeSubTab === 'staff' && (
+            <button
+              onClick={handlePrintStaff}
+              className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-3 rounded-xl font-semibold transition-all shadow-sm"
+              title="Imprimir Relatório de Funcionários"
+            >
+              <Printer size={20} />
+              Imprimir Relatório
+            </button>
+          )}
+          {activeSubTab === 'teachers' && (
+            <button
+              onClick={handlePrintTeachers}
+              className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-4 py-3 rounded-xl font-semibold transition-all shadow-sm"
+              title="Imprimir Relatório de Professores"
+            >
+              <Printer size={20} />
+              Imprimir Relatório
+            </button>
           )}
           <button
             onClick={handleAddNew}
@@ -408,6 +764,12 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
           className={`pb-4 px-4 font-semibold transition-all ${activeSubTab === 'school' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-400'}`}
         >
           Escola
+        </button>
+        <button
+          onClick={() => setActiveSubTab('backup')}
+          className={`pb-4 px-4 font-semibold transition-all ${activeSubTab === 'backup' ? 'text-emerald-600 border-b-2 border-emerald-600' : 'text-slate-400'}`}
+        >
+          Backup
         </button>
       </div>
 
@@ -484,6 +846,63 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
               </div>
               <button type="submit" className="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-xl font-semibold">Salvar</button>
             </form>
+          </div>
+        ) : activeSubTab === 'backup' ? (
+          <div className="p-8">
+            <div className="max-w-2xl mx-auto text-center">
+              <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <Database className="text-emerald-600 w-10 h-10" />
+              </div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Backup e Restauração</h2>
+              <p className="text-slate-500 mb-8">
+                Proteja os dados da sua escola. Exporte todas as informações para um arquivo de segurança ou restaure dados de um backup anterior.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-left">
+                  <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    <Download size={18} className="text-emerald-600" />
+                    Exportar Backup
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Gera um arquivo JSON contendo alunos, professores, turmas, notas e frequências desta escola.
+                  </p>
+                  <button
+                    onClick={handleExportBackup}
+                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-md"
+                  >
+                    Baixar Backup
+                  </button>
+                </div>
+
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-left">
+                  <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    <Upload size={18} className="text-blue-600" />
+                    Restaurar Dados
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Selecione um arquivo de backup (.json) para restaurar as informações da escola.
+                  </p>
+                  <label className="block w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm text-center cursor-pointer">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleImportBackup}
+                      className="hidden"
+                    />
+                    Selecionar Arquivo
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-8 p-4 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-3 text-left">
+                <AlertCircle className="text-amber-600 shrink-0" size={20} />
+                <div className="text-xs text-amber-800">
+                  <p className="font-bold mb-1">Atenção ao Restaurar:</p>
+                  <p>A restauração de dados irá sobrescrever registros existentes com o mesmo ID. Use esta função com cautela, preferencialmente após realizar um backup dos dados atuais.</p>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <table className="w-full text-left">
@@ -716,6 +1135,10 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                           <input type="text" value={formData.registrationNumber || ''} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none" onChange={e => setFormData({ ...formData, registrationNumber: e.target.value })} />
                         </div>
                         <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Nº do Aluno</label>
+                          <input type="text" value={formData.studentNumber || ''} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none" onChange={e => setFormData({ ...formData, studentNumber: e.target.value })} />
+                        </div>
+                        <div>
                           <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Turma</label>
                           <select 
                             value={formData.classId || ''} 
@@ -728,6 +1151,29 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                             ))}
                           </select>
                         </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Status</label>
+                          <select 
+                            value={formData.status || 'active'} 
+                            className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                            onChange={e => setFormData({ ...formData, status: e.target.value as any })}
+                          >
+                            <option value="active">Ativo</option>
+                            <option value="inactive">Inativo</option>
+                            <option value="transferred">Transferido</option>
+                          </select>
+                        </div>
+                        {formData.status === 'transferred' && (
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Data de Transferência</label>
+                            <input 
+                              type="date" 
+                              value={formData.transferDate || ''} 
+                              className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none" 
+                              onChange={e => setFormData({ ...formData, transferDate: e.target.value })} 
+                            />
+                          </div>
+                        )}
                       </>
                     )}
                     {(activeSubTab === 'staff' || activeSubTab === 'teachers') && (
@@ -781,7 +1227,17 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
               {/* Guardian Section */}
               {activeSubTab === 'students' && (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Dados do Responsável</h3>
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider border-b pb-2">Filiação e Responsável</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Nome do Pai</label>
+                      <input type="text" value={formData.fatherName || ''} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none" onChange={e => setFormData({ ...formData, fatherName: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Nome da Mãe</label>
+                      <input type="text" value={formData.motherName || ''} className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none" onChange={e => setFormData({ ...formData, motherName: e.target.value })} />
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Nome do Responsável</label>
@@ -925,38 +1381,72 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                 <h2 className="text-2xl font-bold text-slate-900">Adicionar Alunos</h2>
                 <p className="text-slate-500">Turma: {selectedClass.name} ({selectedClass.grade})</p>
               </div>
-              <button onClick={() => setShowStudentModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => {
+                setShowStudentModal(false);
+                setStudentSearchTerm('');
+              }} className="text-slate-400 hover:text-slate-600">
                 <X size={24} />
               </button>
             </div>
 
             <div className="p-6 overflow-y-auto flex-1">
               <div className="space-y-4">
-                <h3 className="font-semibold text-slate-700">Alunos Disponíveis</h3>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <h3 className="font-semibold text-slate-700">Alunos Disponíveis</h3>
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input 
+                      type="text"
+                      placeholder="Buscar por nome ou matrícula..."
+                      value={studentSearchTerm}
+                      onChange={(e) => setStudentSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                    />
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 gap-2">
-                  {students.filter(s => !s.classId || s.classId === selectedClass.id).map(student => (
-                    <div key={student.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${student.classId === selectedClass.id ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
-                          {student.firstName ? student.firstName[0] : '?'}
+                  {students
+                    .filter(s => !s.classId || s.classId === selectedClass.id)
+                    .filter(s => {
+                      const searchLower = studentSearchTerm.toLowerCase();
+                      const fullName = (s.firstName || s.lastName ? `${s.firstName || ''} ${s.lastName || ''}` : (s as any).name || '').toLowerCase();
+                      const regNum = (s.registrationNumber || '').toLowerCase();
+                      return fullName.includes(searchLower) || regNum.includes(searchLower);
+                    })
+                    .sort((a, b) => {
+                      const nameA = (a.firstName || a.lastName ? `${a.firstName || ''} ${a.lastName || ''}` : (a as any).name || '').toLowerCase();
+                      const nameB = (b.firstName || b.lastName ? `${b.firstName || ''} ${b.lastName || ''}` : (b as any).name || '').toLowerCase();
+                      return nameA.localeCompare(nameB);
+                    })
+                    .map(student => {
+                      const displayName = student.firstName || student.lastName 
+                        ? `${student.firstName || ''} ${student.lastName || ''}`
+                        : (student as any).name || 'Aluno sem nome';
+                      
+                      return (
+                        <div key={student.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${student.classId === selectedClass.id ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-600'}`}>
+                              {displayName[0] || '?'}
+                            </div>
+                            <div>
+                              <p className="font-medium text-slate-900">{displayName}</p>
+                              <p className="text-xs text-slate-500">Matrícula: {student.registrationNumber || 'N/A'}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleAssignStudent(student.id, student.classId === selectedClass.id ? null : selectedClass.id)}
+                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                              student.classId === selectedClass.id
+                                ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                            }`}
+                          >
+                            {student.classId === selectedClass.id ? 'Remover' : 'Adicionar'}
+                          </button>
                         </div>
-                        <div>
-                          <p className="font-medium text-slate-900">{student.firstName} {student.lastName}</p>
-                          <p className="text-xs text-slate-500">Matrícula: {student.registrationNumber}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleAssignStudent(student.id, student.classId === selectedClass.id ? null : selectedClass.id)}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                          student.classId === selectedClass.id
-                            ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                            : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                        }`}
-                      >
-                        {student.classId === selectedClass.id ? 'Remover' : 'Adicionar'}
-                      </button>
-                    </div>
-                  ))}
+                      );
+                    })}
                   {students.filter(s => !s.classId || s.classId === selectedClass.id).length === 0 && (
                     <p className="text-center text-slate-400 py-8">Nenhum aluno disponível para esta turma.</p>
                   )}
@@ -966,7 +1456,10 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
 
             <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
               <button
-                onClick={() => setShowStudentModal(false)}
+                onClick={() => {
+                  setShowStudentModal(false);
+                  setStudentSearchTerm('');
+                }}
                 className="px-6 py-2 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 shadow-md"
               >
                 Concluir
