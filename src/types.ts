@@ -48,7 +48,9 @@ export interface Student {
   contact: string;
   address: Address;
   registrationNumber: string;
-  status: 'active' | 'inactive';
+  studentNumber?: string;
+  status: 'active' | 'inactive' | 'transferred';
+  transferDate?: string;
   classId?: string;
   // Guardian Info
   guardianFirstName: string;
@@ -56,6 +58,8 @@ export interface Student {
   guardianCpf: string;
   guardianRg: string;
   guardianContact: string;
+  fatherName?: string;
+  motherName?: string;
 }
 
 export type StaffRole = 
@@ -158,6 +162,8 @@ export interface Grade {
   value: number;
   writtenActivity1?: number;
   writtenActivity2?: number;
+  projectGrade?: number;
+  oralActivityGrade?: number;
   notebookGrade?: number;
   homeworkGrade?: number;
   teacherId: string;
