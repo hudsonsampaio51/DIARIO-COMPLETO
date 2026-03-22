@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, getDocs, query, where, doc, updateDoc, deleteDoc, writeBatch, setDoc } from 'firebase/firestore';
 import { School, UserProfile, Student, Staff, Class } from '../types';
-import { Plus, Trash2, Edit2, Save, X, Upload, FileSpreadsheet, Building2, ShieldCheck, AlertCircle, Search, Download, UserPlus, Users as UsersIcon } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Upload, FileSpreadsheet, Building2, ShieldCheck, AlertCircle, Search, Download, UserPlus, Users as UsersIcon, Database, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Papa from 'papaparse';
 import { handleFirestoreError, OperationType } from '../utils/errorHandling';
@@ -32,7 +32,7 @@ export const SuperAdminPanel: React.FC = () => {
     logoUrl: ''
   });
 
-  const [activeSubTab, setActiveSubTab] = useState<'schools' | 'users'>('schools');
+  const [activeSubTab, setActiveSubTab] = useState<'schools' | 'users' | 'backup'>('schools');
   const [userFormData, setUserFormData] = useState({ email: '', role: 'admin' as UserProfile['role'], name: '', schoolId: '' });
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -330,6 +330,98 @@ export const SuperAdminPanel: React.FC = () => {
     });
   };
 
+  const handleExportGlobalBackup = async () => {
+    try {
+      setFeedback({ message: 'Preparando backup global...', type: 'success' });
+      const collectionsToBackup = [
+        'schools', 'students', 'staff', 'classes', 'subjects', 'grades', 
+        'attendance', 'occurrences', 'classSessions', 'classSchedules', 'users'
+      ];
+      
+      const backupData: any = {
+        exportDate: new Date().toISOString(),
+        type: 'global',
+        collections: {}
+      };
+
+      for (const colName of collectionsToBackup) {
+        const snap = await getDocs(collection(db, colName));
+        backupData.collections[colName] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `backup_global_sistema_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setFeedback({ message: 'Backup global concluído!', type: 'success' });
+    } catch (error) {
+      console.error("Global backup error:", error);
+      setFeedback({ message: 'Erro ao gerar backup global.', type: 'error' });
+    }
+  };
+
+  const handleImportGlobalBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm('ATENÇÃO: A restauração global irá sobrescrever dados em todo o sistema. Deseja continuar?')) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const backupData = JSON.parse(event.target?.result as string);
+        
+        if (!backupData.collections || backupData.type !== 'global') {
+          throw new Error('Formato de backup global inválido.');
+        }
+
+        setLoading(true);
+        setFeedback({ message: 'Restaurando sistema...', type: 'success' });
+
+        let batch = writeBatch(db);
+        let operationCount = 0;
+
+        for (const [colName, docs] of Object.entries(backupData.collections)) {
+          const documents = docs as any[];
+          for (const docData of documents) {
+            const { id, ...data } = docData;
+            const docRef = doc(db, colName as string, id);
+            batch.set(docRef, data, { merge: true });
+            operationCount++;
+
+            if (operationCount >= 400) {
+              await batch.commit();
+              batch = writeBatch(db);
+              operationCount = 0;
+            }
+          }
+        }
+
+        if (operationCount > 0) {
+          await batch.commit();
+        }
+
+        setFeedback({ message: 'Restauração global concluída!', type: 'success' });
+        fetchSchools();
+        fetchUsers();
+      } catch (error) {
+        console.error("Global restore error:", error);
+        setFeedback({ message: 'Erro na restauração global.', type: 'error' });
+      } finally {
+        setLoading(false);
+        if (e.target) e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <header className="mb-12 flex justify-between items-end">
@@ -347,6 +439,12 @@ export const SuperAdminPanel: React.FC = () => {
               className={`px-4 py-2 rounded-xl font-bold transition-all ${activeSubTab === 'users' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-white text-slate-400 hover:text-slate-600'}`}
             >
               Usuários e Acessos
+            </button>
+            <button 
+              onClick={() => setActiveSubTab('backup')}
+              className={`px-4 py-2 rounded-xl font-bold transition-all ${activeSubTab === 'backup' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'bg-white text-slate-400 hover:text-slate-600'}`}
+            >
+              Backup Global
             </button>
           </div>
         </div>
@@ -466,6 +564,63 @@ export const SuperAdminPanel: React.FC = () => {
                 </div>
               )}
             </>
+          ) : activeSubTab === 'backup' ? (
+            <div className="bg-white rounded-3xl p-8 border border-slate-100">
+              <div className="max-w-2xl mx-auto text-center">
+                <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                  <Database className="text-emerald-600 w-10 h-10" />
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Backup Global do Sistema</h2>
+                <p className="text-slate-500 mb-8">
+                  Esta ferramenta permite exportar e restaurar TODOS os dados de TODAS as escolas cadastradas no sistema. Use com extrema cautela.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-left">
+                    <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                      <Download size={18} className="text-emerald-600" />
+                      Exportar Tudo
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">
+                      Gera um arquivo JSON completo com escolas, alunos, professores, notas e usuários de todo o sistema.
+                    </p>
+                    <button
+                      onClick={handleExportGlobalBackup}
+                      className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-md"
+                    >
+                      Baixar Backup Global
+                    </button>
+                  </div>
+
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-left">
+                    <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                      <Upload size={18} className="text-blue-600" />
+                      Restaurar Sistema
+                    </h3>
+                    <p className="text-xs text-slate-500 mb-4">
+                      Restaura o sistema completo a partir de um arquivo de backup global.
+                    </p>
+                    <label className="block w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm text-center cursor-pointer">
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleImportGlobalBackup}
+                        className="hidden"
+                      />
+                      Selecionar Arquivo Global
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mt-8 p-6 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-4 text-left">
+                  <AlertCircle className="text-red-600 shrink-0" size={24} />
+                  <div className="text-sm text-red-800">
+                    <p className="font-bold mb-1 uppercase tracking-wider">Aviso Crítico:</p>
+                    <p>A restauração global é uma operação destrutiva que pode sobrescrever dados importantes em todas as escolas. Certifique-se de que o arquivo de backup é confiável e recente.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <>
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
