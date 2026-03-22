@@ -158,8 +158,11 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
   };
 
   const filteredStudents = students.filter(s => {
-    const matchesSearch = `${s.firstName} ${s.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         s.registrationNumber.includes(searchTerm);
+    const fullName = `${s.firstName || ''} ${s.lastName || ''}`.toLowerCase();
+    const regNumber = (s.registrationNumber || '').toLowerCase();
+    const search = searchTerm.toLowerCase();
+    
+    const matchesSearch = fullName.includes(search) || regNumber.includes(search);
     const matchesClass = selectedClassId ? s.classId === selectedClassId : true;
     return matchesSearch && matchesClass;
   });
@@ -177,8 +180,15 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                 referrerPolicy="no-referrer"
               />
               <div>
-                <h2 className="text-2xl font-bold mb-1">{student.firstName} {student.lastName}</h2>
-                <p className="text-slate-400">Matrícula: {student.registrationNumber} | Turma: {classes[student.classId || ''] || '---'}</p>
+                <h2 className="text-xl font-bold mb-0.5">{school?.name || 'NOME DA ESCOLA'}</h2>
+                <div className="text-[9px] text-slate-400 uppercase font-medium leading-tight mb-2">
+                  <p>{school?.address || ''}</p>
+                  {school?.creationDecree && <p>DECRETO: {school.creationDecree}</p>}
+                  {school?.authorization && <p>AUTORIZAÇÃO/PARECER: {school.authorization}</p>}
+                  {school?.resolution && <p>RESOLUÇÃO: {school.resolution}</p>}
+                </div>
+                <h3 className="text-lg font-bold text-emerald-400">{student.firstName || ''} {student.lastName || ''}</h3>
+                <p className="text-xs text-slate-400">Matrícula: {student.registrationNumber || '---'} | Turma: {classes[student.classId || ''] || '---'}</p>
               </div>
             </div>
             <GraduationCap size={48} className="text-emerald-500 opacity-50" />
@@ -200,66 +210,89 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {Array.from(new Set([...Object.keys(studentGrades.reduce((acc, grade) => {
-                  const subjectId = grade.subjectId || 'default';
-                  if (!acc[subjectId]) acc[subjectId] = {};
-                  acc[subjectId][grade.period] = grade.value;
-                  return acc;
-                }, {} as Record<string, Record<string, number>>)), ...Object.keys(studentAbsences)])).map((subjectId) => {
-                const periods = studentGrades.filter(g => (g.subjectId || 'default') === subjectId).reduce((acc, grade) => {
-                  acc[grade.period] = grade.value;
-                  return acc;
-                }, {} as Record<string, number>);
-                
-                const b1 = periods['1º Bimestre'] || 0;
-                const b2 = periods['2º Bimestre'] || 0;
-                const b3 = periods['3º Bimestre'] || 0;
-                const b4 = periods['4º Bimestre'] || 0;
-                const count = [b1, b2, b3, b4].filter(v => v > 0).length;
-                const media = count > 0 ? (b1 + b2 + b3 + b4) / count : 0;
+              {(() => {
+                // Group grades and absences by subject name
+                const groupedData: Record<string, { 
+                  grades: Record<string, number>, 
+                  absences: Record<string, number>,
+                  workload?: number 
+                }> = {};
 
-                const abs = (studentAbsences as any)[subjectId] || {};
-                const f1 = abs['1º Bimestre'] || 0;
-                const f2 = abs['2º Bimestre'] || 0;
-                const f3 = abs['3º Bimestre'] || 0;
-                const f4 = abs['4º Bimestre'] || 0;
-                const fTotal = (abs['Total'] || 0) + f1 + f2 + f3 + f4;
+                // Process grades
+                studentGrades.forEach(grade => {
+                  const subjectName = subjects[grade.subjectId || '']?.name || 'Disciplina';
+                  const workload = subjects[grade.subjectId || '']?.workload;
+                  
+                  if (!groupedData[subjectName]) {
+                    groupedData[subjectName] = { grades: {}, absences: {}, workload };
+                  }
+                  groupedData[subjectName].grades[grade.period] = grade.value;
+                  if (workload) groupedData[subjectName].workload = workload;
+                });
 
-                return (
-                  <tr key={subjectId} className="hover:bg-slate-50 transition-colors">
-                    <td className="py-4 font-semibold text-slate-800">{subjects[subjectId]?.name || 'Disciplina'}</td>
-                    <td className="py-4 text-center text-slate-500 font-medium">{subjects[subjectId]?.workload || '0'}h</td>
-                    <td className="py-4 text-center text-slate-500">
-                      <span className="font-bold">{b1 > 0 ? b1.toFixed(1) : '-'}</span>
-                      <span className="mx-1 text-slate-300">|</span>
-                      <span className="text-red-500 text-sm">{f1 > 0 ? f1 : '-'}</span>
-                    </td>
-                    <td className="py-4 text-center text-slate-500">
-                      <span className="font-bold">{b2 > 0 ? b2.toFixed(1) : '-'}</span>
-                      <span className="mx-1 text-slate-300">|</span>
-                      <span className="text-red-500 text-sm">{f2 > 0 ? f2 : '-'}</span>
-                    </td>
-                    <td className="py-4 text-center text-slate-500">
-                      <span className="font-bold">{b3 > 0 ? b3.toFixed(1) : '-'}</span>
-                      <span className="mx-1 text-slate-300">|</span>
-                      <span className="text-red-500 text-sm">{f3 > 0 ? f3 : '-'}</span>
-                    </td>
-                    <td className="py-4 text-center text-slate-500">
-                      <span className="font-bold">{b4 > 0 ? b4.toFixed(1) : '-'}</span>
-                      <span className="mx-1 text-slate-300">|</span>
-                      <span className="text-red-500 text-sm">{f4 > 0 ? f4 : '-'}</span>
-                    </td>
-                    <td className="py-4 text-center">
-                      <span className={`px-3 py-1 rounded-full font-bold ${media >= 6 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                        {media > 0 ? media.toFixed(1) : '-'}
-                      </span>
-                    </td>
-                    <td className="py-4 text-center font-bold text-slate-600">
-                      {fTotal}
-                    </td>
-                  </tr>
-                );
-              })}
+                // Process absences
+                Object.entries(studentAbsences).forEach(([subjectId, abs]) => {
+                  const subjectName = subjects[subjectId]?.name || 'Disciplina';
+                  if (!groupedData[subjectName]) {
+                    groupedData[subjectName] = { grades: {}, absences: {} };
+                  }
+                  
+                  Object.entries(abs as Record<string, number>).forEach(([period, count]) => {
+                    groupedData[subjectName].absences[period] = (groupedData[subjectName].absences[period] || 0) + count;
+                  });
+                });
+
+                return Object.entries(groupedData).map(([subjectName, data]) => {
+                  const b1 = data.grades['1º Bimestre'] || 0;
+                  const b2 = data.grades['2º Bimestre'] || 0;
+                  const b3 = data.grades['3º Bimestre'] || 0;
+                  const b4 = data.grades['4º Bimestre'] || 0;
+                  
+                  const f1 = data.absences['1º Bimestre'] || 0;
+                  const f2 = data.absences['2º Bimestre'] || 0;
+                  const f3 = data.absences['3º Bimestre'] || 0;
+                  const f4 = data.absences['4º Bimestre'] || 0;
+                  
+                  const count = [b1, b2, b3, b4].filter(v => v > 0).length;
+                  const media = count > 0 ? (b1 + b2 + b3 + b4) / count : 0;
+                  const fTotal = (data.absences['Total'] || 0) + f1 + f2 + f3 + f4;
+
+                  return (
+                    <tr key={subjectName} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-4 font-semibold text-slate-800">{subjectName}</td>
+                      <td className="py-4 text-center text-slate-500 font-medium">{data.workload ? `${data.workload}h` : '-'}</td>
+                      <td className="py-4 text-center text-slate-500">
+                        <span className="font-bold">{b1 > 0 ? b1.toFixed(1) : '-'}</span>
+                        <span className="mx-1 text-slate-300">|</span>
+                        <span className="text-red-500 text-sm">{f1 > 0 ? f1 : '-'}</span>
+                      </td>
+                      <td className="py-4 text-center text-slate-500">
+                        <span className="font-bold">{b2 > 0 ? b2.toFixed(1) : '-'}</span>
+                        <span className="mx-1 text-slate-300">|</span>
+                        <span className="text-red-500 text-sm">{f1 > 0 ? f2 : '-'}</span>
+                      </td>
+                      <td className="py-4 text-center text-slate-500">
+                        <span className="font-bold">{b3 > 0 ? b3.toFixed(1) : '-'}</span>
+                        <span className="mx-1 text-slate-300">|</span>
+                        <span className="text-red-500 text-sm">{f3 > 0 ? f3 : '-'}</span>
+                      </td>
+                      <td className="py-4 text-center text-slate-500">
+                        <span className="font-bold">{b4 > 0 ? b4.toFixed(1) : '-'}</span>
+                        <span className="mx-1 text-slate-300">|</span>
+                        <span className="text-red-500 text-sm">{f4 > 0 ? f4 : '-'}</span>
+                      </td>
+                      <td className="py-4 text-center">
+                        <span className={`px-3 py-1 rounded-full font-bold ${media >= 6 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                          {media > 0 ? media.toFixed(1) : '-'}
+                        </span>
+                      </td>
+                      <td className="py-4 text-center font-bold text-slate-600">
+                        {fTotal}
+                      </td>
+                    </tr>
+                  );
+                });
+              })()}
               {studentGrades.length === 0 && Object.keys(studentAbsences).length === 0 && (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400 italic">Nenhum registro encontrado para este aluno.</td>
