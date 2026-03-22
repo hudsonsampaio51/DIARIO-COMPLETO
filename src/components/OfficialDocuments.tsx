@@ -163,22 +163,25 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
   };
 
   const filteredStudents = students.filter(s => {
-    const matchesSearch = `${s.firstName} ${s.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         s.registrationNumber.includes(searchTerm);
+    const fullName = `${s.firstName || ''} ${s.lastName || ''}`.toLowerCase();
+    const regNumber = (s.registrationNumber || '').toLowerCase();
+    const search = searchTerm.toLowerCase();
+    
+    const matchesSearch = fullName.includes(search) || regNumber.includes(search);
     const matchesClass = selectedClassId ? s.classId === selectedClassId : true;
     return matchesSearch && matchesClass;
   });
 
   const renderDocument = (student: Student, studentGrades: Grade[], studentAbsences: Record<string, Record<string, number>>, isBulk = false) => {
     return (
-      <div key={student.id} className={`bg-white p-12 shadow-xl border border-slate-100 min-h-[800px] print:shadow-none print:border-none print:p-0 ${isBulk ? 'mb-8 page-break-after-always' : ''}`}>
+      <div key={student.id} className={`bg-white p-6 shadow-xl border border-slate-100 min-h-[800px] print:shadow-none print:border-none print:p-0 ${isBulk ? 'mb-8 page-break-after-always' : ''}`}>
         {/* Document Header */}
-        <div className="text-center mb-12 border-b-2 border-slate-900 pb-8">
-          <div className="flex justify-center mb-6">
+        <div className="text-center mb-6 border-b-2 border-slate-900 pb-4">
+          <div className="flex justify-center mb-4">
             <img 
               src={school?.logoUrl || 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Bras%C3%A3o_de_Ji-Paran%C3%A1.png/200px-Bras%C3%A3o_de_Ji-Paran%C3%A1.png'} 
               alt={school?.name || 'Brasão'} 
-              className="h-24 w-auto object-contain"
+              className="h-16 w-auto object-contain"
               referrerPolicy="no-referrer"
             />
           </div>
@@ -188,17 +191,23 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Secretaria Municipal de Educação</p>
           </div>
           <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">{school?.name || 'NOME DA ESCOLA'}</h2>
-          <p className="text-xs text-slate-500 mt-2">{school?.address || 'ENDEREÇO'} - Ano Letivo {school?.schoolYear || '---'}</p>
+          <div className="text-[10px] text-slate-600 mt-2 uppercase font-medium leading-relaxed">
+            <p>{school?.address || 'ENDEREÇO'}</p>
+            {school?.creationDecree && <p>DECRETO: {school.creationDecree}</p>}
+            {school?.authorization && <p>AUTORIZAÇÃO/PARECER: {school.authorization}</p>}
+            {school?.resolution && <p>RESOLUÇÃO: {school.resolution}</p>}
+            <p>Ano Letivo {school?.schoolYear || '---'}</p>
+          </div>
         </div>
 
         {docType === 'declaration' ? (
-          <div className="space-y-8 text-slate-800 leading-relaxed">
-            <h3 className="text-xl font-bold text-center uppercase underline mb-12">Declaração de Matrícula</h3>
+          <div className="space-y-4 text-slate-800 leading-relaxed">
+            <h3 className="text-xl font-bold text-center uppercase underline mb-6">Declaração de Matrícula</h3>
             
             <p className="text-justify indent-12">
-              Declaramos para os devidos fins que o(a) aluno(a) <strong className="uppercase">{student.firstName} {student.lastName}</strong>, 
-              portador(a) da matrícula nº <strong>{student.registrationNumber}</strong>, CPF nº <strong>{student.cpf}</strong>, 
-              nascido(a) em <strong>{student.birthDate}</strong> na cidade de <strong>{student.birthPlace}</strong>, 
+              Declaramos para os devidos fins que o(a) aluno(a) <strong className="uppercase">{student.firstName || ''} {student.lastName || ''}</strong>, 
+              portador(a) da matrícula nº <strong>{student.registrationNumber || '---'}</strong>, CPF nº <strong>{student.cpf || '---'}</strong>, 
+              nascido(a) em <strong>{student.birthDate || '---'}</strong> na cidade de <strong>{student.birthPlace || '---'}</strong>, 
               encontra-se regularmente matriculado(a) e frequentando as aulas nesta instituição de ensino no presente ano letivo.
             </p>
 
@@ -208,10 +217,10 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
               <strong> {student.guardianFirstName || '---'} {student.guardianLastName || '---'}</strong>, CPF nº <strong>{student.guardianCpf || '---'}</strong>.
             </p>
 
-            <div className="pt-24 text-center space-y-12">
+            <div className="pt-12 text-center space-y-8">
               <p>Ji-Paraná, {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
               
-              <div className="flex justify-center gap-24 pt-12">
+              <div className="flex justify-center gap-24 pt-8">
                 <div className="text-center">
                   <div className="w-64 border-t border-slate-900 mx-auto mb-2"></div>
                   <p className="text-xs font-bold uppercase">Secretaria Escolar</p>
@@ -224,16 +233,31 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
             </div>
           </div>
         ) : docType === 'transcript' ? (
-          <div className="space-y-8 text-slate-800">
-            <h3 className="text-xl font-bold text-center uppercase underline mb-8">Histórico Escolar Parcial</h3>
+          <div className="space-y-4 text-slate-800">
+            <h3 className="text-xl font-bold text-center uppercase underline mb-4">Histórico Escolar Parcial</h3>
             
-            <div className="grid grid-cols-2 gap-4 text-sm mb-8">
-              <p><strong>ALUNO:</strong> {student.firstName} {student.lastName}</p>
-              <p><strong>MATRÍCULA:</strong> {student.registrationNumber}</p>
-              <p><strong>CPF:</strong> {student.cpf}</p>
-              <p><strong>DATA DE NASCIMENTO:</strong> {student.birthDate || '---'}</p>
-              <p><strong>LOCAL DE NASCIMENTO:</strong> {student.birthPlace || '---'}</p>
-              <p><strong>SITUAÇÃO:</strong> {student.status === 'active' ? 'CURSANDO' : 'INATIVO'}</p>
+            <div className="border border-slate-900 p-4 space-y-2 text-xs uppercase font-bold mb-4">
+              <div className="flex gap-4">
+                <p className="flex-1">NOME DO (A) ESTUDANTE: <span className="font-normal border-b border-slate-400 px-2">{student.firstName || ''} {student.lastName || ''}</span></p>
+              </div>
+              <div className="flex gap-8">
+                <p>DATA DE NASC.: <span className="font-normal border-b border-slate-400 px-2">{student.birthDate || '---'}</span></p>
+                <p className="flex-1">CIDADE: <span className="font-normal border-b border-slate-400 px-2">{student.address?.city || '---'}</span></p>
+                <p>UF: <span className="font-normal border-b border-slate-400 px-2">{school?.state || '---'}</span></p>
+              </div>
+              <div>
+                <p>NOME DO PAI: <span className="font-normal border-b border-slate-400 px-2">{student.fatherName || '---'}</span></p>
+              </div>
+              <div>
+                <p>NOME DA MÃE: <span className="font-normal border-b border-slate-400 px-2">{student.motherName || '---'}</span></p>
+              </div>
+              <div className="flex justify-between gap-4 pt-2">
+                <p>ANO LETIVO: <span className="font-normal border-b border-slate-400 px-2">{school?.schoolYear || '---'}</span></p>
+                <p>ANO: <span className="font-normal border-b border-slate-400 px-2">{classList.find(c => c.id === student.classId)?.grade || '---'}</span></p>
+                <p>TURNO: <span className="font-normal border-b border-slate-400 px-2">{classList.find(c => c.id === student.classId)?.shift || '---'}</span></p>
+                <p>TURMA: <span className="font-normal border-b border-slate-400 px-2">{classList.find(c => c.id === student.classId)?.name || '---'}</span></p>
+                <p>Nº: <span className="font-normal border-b border-slate-400 px-2">{student.studentNumber || '---'}</span></p>
+              </div>
             </div>
 
             <table className="w-full border-collapse border border-slate-900 text-sm">
@@ -262,7 +286,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                   return (
                     <tr key={subjectId}>
                       <td className="border border-slate-900 p-2">{subjects[subjectId]?.name || 'Disciplina'}</td>
-                      <td className="border border-slate-900 p-2 text-center">{subjects[subjectId]?.workload || '0'}h</td>
+                      <td className="border border-slate-900 p-2 text-center">{subjects[subjectId]?.workload ? `${subjects[subjectId].workload}h` : '-'}</td>
                       <td className="border border-slate-900 p-2 text-center">Ano Letivo</td>
                       <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(1) : '-'}</td>
                       <td className="border border-slate-900 p-2 text-center font-bold">{fTotal}</td>
@@ -282,19 +306,38 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
               </tbody>
             </table>
 
-            <div className="pt-24 text-center">
-              <p className="text-xs mb-12">Documento emitido eletronicamente via Sistema EduGestão em {new Date().toLocaleString('pt-BR')}</p>
+            <div className="pt-12 text-center">
+              <p className="text-xs mb-6">Documento emitido eletronicamente via Sistema EduGestão em {new Date().toLocaleString('pt-BR')}</p>
               <div className="w-64 border-t border-slate-900 mx-auto mb-2"></div>
               <p className="text-xs font-bold uppercase">Carimbo e Assinatura da Secretaria</p>
             </div>
           </div>
         ) : docType === 'boletim' ? (
-          <div className="space-y-8 text-slate-800">
-            <h3 className="text-xl font-bold text-center uppercase underline mb-8">Boletim Escolar</h3>
+          <div className="space-y-3 text-slate-800">
+            <h3 className="text-xl font-bold text-center uppercase underline mb-2">Boletim Escolar</h3>
             
-            <div className="grid grid-cols-2 gap-4 text-sm mb-8">
-              <p><strong>ALUNO:</strong> {student.firstName} {student.lastName}</p>
-              <p><strong>TURMA:</strong> {classes[student.classId || ''] || '---'}</p>
+            <div className="border border-slate-900 p-4 space-y-2 text-xs uppercase font-bold">
+              <div className="flex gap-4">
+                <p className="flex-1">NOME DO (A) ESTUDANTE: <span className="font-normal border-b border-slate-400 px-2">{student.firstName || ''} {student.lastName || ''}</span></p>
+              </div>
+              <div className="flex gap-8">
+                <p>DATA DE NASC.: <span className="font-normal border-b border-slate-400 px-2">{student.birthDate || '---'}</span></p>
+                <p className="flex-1">CIDADE: <span className="font-normal border-b border-slate-400 px-2">{student.address?.city || '---'}</span></p>
+                <p>UF: <span className="font-normal border-b border-slate-400 px-2">{school?.state || '---'}</span></p>
+              </div>
+              <div>
+                <p>NOME DO PAI: <span className="font-normal border-b border-slate-400 px-2">{student.fatherName || '---'}</span></p>
+              </div>
+              <div>
+                <p>NOME DA MÃE: <span className="font-normal border-b border-slate-400 px-2">{student.motherName || '---'}</span></p>
+              </div>
+              <div className="flex justify-between gap-4 pt-2">
+                <p>ANO LETIVO: <span className="font-normal border-b border-slate-400 px-2">{school?.schoolYear || '---'}</span></p>
+                <p>ANO: <span className="font-normal border-b border-slate-400 px-2">{classList.find(c => c.id === student.classId)?.grade || '---'}</span></p>
+                <p>TURNO: <span className="font-normal border-b border-slate-400 px-2">{classList.find(c => c.id === student.classId)?.shift || '---'}</span></p>
+                <p>TURMA: <span className="font-normal border-b border-slate-400 px-2">{classList.find(c => c.id === student.classId)?.name || '---'}</span></p>
+                <p>Nº: <span className="font-normal border-b border-slate-400 px-2">{student.studentNumber || '---'}</span></p>
+              </div>
             </div>
 
             <table className="w-full border-collapse border border-slate-900 text-sm">
@@ -311,52 +354,78 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                 </tr>
               </thead>
               <tbody>
-                {Array.from(new Set([...Object.keys(studentGrades.reduce((acc, grade) => {
-                    const subjectId = grade.subjectId || 'default';
-                    if (!acc[subjectId]) acc[subjectId] = {};
-                    acc[subjectId][grade.period] = grade.value;
-                    return acc;
-                  }, {} as Record<string, Record<string, number>>)), ...Object.keys(studentAbsences)])).map((subjectId) => {
-                  const periods = studentGrades.filter(g => (g.subjectId || 'default') === subjectId).reduce((acc, grade) => {
-                    acc[grade.period] = grade.value;
-                    return acc;
-                  }, {} as Record<string, number>);
-                  
-                  const b1 = periods['1º Bimestre'] || 0;
-                  const b2 = periods['2º Bimestre'] || 0;
-                  const b3 = periods['3º Bimestre'] || 0;
-                  const b4 = periods['4º Bimestre'] || 0;
-                  const count = [b1, b2, b3, b4].filter(v => v > 0).length;
-                  const media = count > 0 ? (b1 + b2 + b3 + b4) / count : 0;
+                {(() => {
+                  // Group grades and absences by subject name
+                  const groupedData: Record<string, { 
+                    grades: Record<string, number>, 
+                    absences: Record<string, number>,
+                    workload?: number 
+                  }> = {};
 
-                  const abs = (studentAbsences as any)[subjectId] || {};
-                  const f1 = abs['1º Bimestre'] || 0;
-                  const f2 = abs['2º Bimestre'] || 0;
-                  const f3 = abs['3º Bimestre'] || 0;
-                  const f4 = abs['4º Bimestre'] || 0;
-                  const fTotal = (abs['Total'] || 0) + f1 + f2 + f3 + f4;
+                  // Process grades
+                  studentGrades.forEach(grade => {
+                    const subjectName = subjects[grade.subjectId || '']?.name || 'Disciplina';
+                    const workload = subjects[grade.subjectId || '']?.workload;
+                    
+                    if (!groupedData[subjectName]) {
+                      groupedData[subjectName] = { grades: {}, absences: {}, workload };
+                    }
+                    // If multiple grades for same period/subject name, take the highest or average? 
+                    // Usually they should be the same if they are duplicates.
+                    // We'll take the latest one or just overwrite.
+                    groupedData[subjectName].grades[grade.period] = grade.value;
+                    if (workload) groupedData[subjectName].workload = workload;
+                  });
 
-                  return (
-                    <tr key={subjectId}>
-                      <td className="border border-slate-900 p-2 font-bold">{subjects[subjectId]?.name || 'Disciplina'}</td>
-                      <td className="border border-slate-900 p-2 text-center">{subjects[subjectId]?.workload || '0'}h</td>
-                      <td className="border border-slate-900 p-2 text-center">
-                        {b1 > 0 ? b1.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f1 > 0 ? f1 : '-'}</span>
-                      </td>
-                      <td className="border border-slate-900 p-2 text-center">
-                        {b2 > 0 ? b2.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f2 > 0 ? f2 : '-'}</span>
-                      </td>
-                      <td className="border border-slate-900 p-2 text-center">
-                        {b3 > 0 ? b3.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f3 > 0 ? f3 : '-'}</span>
-                      </td>
-                      <td className="border border-slate-900 p-2 text-center">
-                        {b4 > 0 ? b4.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f4 > 0 ? f4 : '-'}</span>
-                      </td>
-                      <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(1) : '-'}</td>
-                      <td className="border border-slate-900 p-2 text-center font-bold">{fTotal}</td>
-                    </tr>
-                  );
-                })}
+                  // Process absences
+                  Object.entries(studentAbsences).forEach(([subjectId, abs]) => {
+                    const subjectName = subjects[subjectId]?.name || 'Disciplina';
+                    if (!groupedData[subjectName]) {
+                      groupedData[subjectName] = { grades: {}, absences: {} };
+                    }
+                    
+                    Object.entries(abs as Record<string, number>).forEach(([period, count]) => {
+                      groupedData[subjectName].absences[period] = (groupedData[subjectName].absences[period] || 0) + count;
+                    });
+                  });
+
+                  return Object.entries(groupedData).map(([subjectName, data]) => {
+                    const b1 = data.grades['1º Bimestre'] || 0;
+                    const b2 = data.grades['2º Bimestre'] || 0;
+                    const b3 = data.grades['3º Bimestre'] || 0;
+                    const b4 = data.grades['4º Bimestre'] || 0;
+                    
+                    const f1 = data.absences['1º Bimestre'] || 0;
+                    const f2 = data.absences['2º Bimestre'] || 0;
+                    const f3 = data.absences['3º Bimestre'] || 0;
+                    const f4 = data.absences['4º Bimestre'] || 0;
+                    
+                    const count = [b1, b2, b3, b4].filter(v => v > 0).length;
+                    const media = count > 0 ? (b1 + b2 + b3 + b4) / count : 0;
+                    const fTotal = (data.absences['Total'] || 0) + f1 + f2 + f3 + f4;
+
+                    return (
+                      <tr key={subjectName}>
+                        <td className="border border-slate-900 p-2 font-bold">{subjectName}</td>
+                        <td className="border border-slate-900 p-2 text-center">{data.workload ? `${data.workload}h` : '-'}</td>
+                        <td className="border border-slate-900 p-2 text-center">
+                          {b1 > 0 ? b1.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f1 > 0 ? f1 : '-'}</span>
+                        </td>
+                        <td className="border border-slate-900 p-2 text-center">
+                          {b2 > 0 ? b2.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f2 > 0 ? f2 : '-'}</span>
+                        </td>
+                        <td className="border border-slate-900 p-2 text-center">
+                          {b3 > 0 ? b3.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f3 > 0 ? f3 : '-'}</span>
+                        </td>
+                        <td className="border border-slate-900 p-2 text-center">
+                          {b4 > 0 ? b4.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f4 > 0 ? f4 : '-'}</span>
+                        </td>
+                        <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(1) : '-'}</td>
+                        <td className="border border-slate-900 p-2 text-center font-bold">{fTotal}</td>
+                      </tr>
+                    );
+                  });
+                })()}
                 {studentGrades.length === 0 && Object.keys(studentAbsences).length === 0 && (
                   <tr>
                     <td colSpan={8} className="border border-slate-900 p-8 text-center italic text-slate-400">
@@ -373,7 +442,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
               <h3 className="text-lg font-bold uppercase mb-4">Canhoto de Entrega de Documentos</h3>
               <p className="text-sm mb-8">
                 Recebi da Escola <strong>{school?.name || '---'}</strong> o documento solicitado referente ao aluno(a) 
-                <strong> {student.firstName} {student.lastName}</strong>.
+                <strong> {student.firstName || ''} {student.lastName || ''}</strong>.
               </p>
               <div className="flex justify-between items-end pt-12">
                 <div className="text-left">
@@ -400,6 +469,10 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
           .print-container { position: absolute; left: 0; top: 0; width: 100%; }
           .no-print { display: none !important; }
           .page-break-after-always { page-break-after: always; }
+          @page {
+            margin: 1cm;
+            size: auto;
+          }
         }
       `}</style>
 
@@ -488,8 +561,8 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                       : 'bg-white border-slate-100 text-slate-600 hover:border-slate-200'
                   }`}
                 >
-                  <p className="font-bold">{student.firstName} {student.lastName}</p>
-                  <p className="text-xs opacity-70">Mat: {student.registrationNumber} | {classes[student.classId || '']}</p>
+                  <p className="font-bold">{student.firstName || ''} {student.lastName || ''}</p>
+                  <p className="text-xs opacity-70">Mat: {student.registrationNumber || '---'} | {classes[student.classId || '']}</p>
                 </button>
               ))}
             </div>
