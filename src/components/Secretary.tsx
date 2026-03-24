@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, addDoc, getDocs, deleteDoc, doc, getDoc, updateDoc, writeBatch, setDoc, query, where, limit } from 'firebase/firestore';
-import { Student, Staff, Class, StaffRole, ClassShift, UserProfile, UserRole, Subject } from '../types';
+import { Student, Staff, Class, StaffRole, ClassShift, UserProfile, UserRole, Subject, EducationLevel } from '../types';
 import { Plus, Trash2, Edit2, Search, UserPlus, BookPlus, GraduationCap, FileUp, Download, X, ShieldCheck, AlertCircle, Database, RefreshCw, Upload, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Papa from 'papaparse';
@@ -447,6 +447,155 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
     reader.readAsText(file);
   };
 
+  const handleImportEducacenso = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split(/\r?\n/);
+        
+        setImporting(true);
+        setFeedback({ message: 'Importando dados do Educacenso...', type: 'success' });
+
+        let batch = writeBatch(db);
+        let operationCount = 0;
+
+        const classesToImport: any[] = [];
+        const peopleToImport: any[] = [];
+        const enrollments: { personId: string, classId: string }[] = [];
+        const assignments: { personId: string, classId: string }[] = [];
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const fields = line.split('|');
+          const type = fields[0];
+
+          if (type === '20') {
+            // Turma
+            const classId = fields[3];
+            const className = fields[4];
+            if (classId && className) {
+              const startHour = parseInt(fields[6]) || 0;
+              const endHour = parseInt(fields[8]) || 0;
+              let shift: ClassShift = 'Matutino';
+              if (startHour >= 7 && endHour >= 16) shift = 'Integral';
+              else if (startHour >= 12) shift = 'Vespertino';
+              else if (startHour >= 18) shift = 'Noturno';
+
+              let educationLevel: EducationLevel = 'Ensino Fundamental I';
+              if (className.includes('PRE') || className.includes('INFANTIL')) educationLevel = 'Educação Infantil';
+              else if (className.includes('6º') || className.includes('7º') || className.includes('8º') || className.includes('9º')) educationLevel = 'Ensino Fundamental II';
+
+              classesToImport.push({
+                id: classId,
+                name: className,
+                grade: className.split(' - ')[0] || '',
+                shift,
+                educationLevel,
+                year: new Date().getFullYear(),
+                schoolId
+              });
+            }
+          } else if (type === '30') {
+            // Pessoa (Aluno ou Professor/Funcionário)
+            const personId = fields[3];
+            const cpf = fields[4];
+            const name = fields[5];
+            const birthDate = fields[6];
+            const isStudent = fields[43] === '2'; // Fixed index from 42 to 43
+
+            if (personId && name) {
+              const nameParts = name.trim().split(' ');
+              const firstName = nameParts[0];
+              const lastName = nameParts.slice(1).join(' ');
+
+              peopleToImport.push({
+                id: personId,
+                firstName,
+                lastName,
+                cpf: cpf || '',
+                birthDate: birthDate || '',
+                isStudent,
+                schoolId
+              });
+            }
+          } else if (type === '50') {
+            // Vínculo Professor-Turma
+            const personId = fields[3];
+            const classId = fields[5];
+            if (personId && classId) {
+              assignments.push({ personId, classId });
+            }
+          } else if (type === '60') {
+            // Vínculo Aluno-Turma
+            const personId = fields[3];
+            const classId = fields[5];
+            if (personId && classId) {
+              enrollments.push({ personId, classId });
+            }
+          }
+        }
+
+        // Process Classes
+        for (const cls of classesToImport) {
+          const { id, ...data } = cls;
+          batch.set(doc(db, 'classes', id), data, { merge: true });
+          operationCount++;
+          if (operationCount >= 450) { await batch.commit(); batch = writeBatch(db); operationCount = 0; }
+        }
+
+        // Process People
+        for (const person of peopleToImport) {
+          const { id, isStudent, ...data } = person;
+          const collectionName = isStudent ? 'students' : 'staff';
+          const finalData: any = { 
+            ...data, 
+            status: 'active'
+          };
+          if (isStudent) {
+            finalData.registrationNumber = id;
+          } else {
+            finalData.role = 'Professor';
+          }
+          batch.set(doc(db, collectionName, id), finalData, { merge: true });
+          operationCount++;
+          if (operationCount >= 450) { await batch.commit(); batch = writeBatch(db); operationCount = 0; }
+        }
+
+        // Process Enrollments (Students to Classes)
+        for (const enrollment of enrollments) {
+          batch.set(doc(db, 'students', enrollment.personId), { classId: enrollment.classId }, { merge: true });
+          operationCount++;
+          if (operationCount >= 450) { await batch.commit(); batch = writeBatch(db); operationCount = 0; }
+        }
+
+        // Process Assignments (Teachers to Classes)
+        for (const assignment of assignments) {
+          batch.set(doc(db, 'classes', assignment.classId), { teacherId: assignment.personId }, { merge: true });
+          operationCount++;
+          if (operationCount >= 450) { await batch.commit(); batch = writeBatch(db); operationCount = 0; }
+        }
+
+        if (operationCount > 0) {
+          await batch.commit();
+        }
+
+        setFeedback({ message: 'Importação do Educacenso concluída!', type: 'success' });
+        fetchData();
+      } catch (error) {
+        console.error("Educacenso import error:", error);
+        setFeedback({ message: 'Erro ao importar arquivo do Educacenso. Verifique o formato.', type: 'error' });
+      } finally {
+        setImporting(false);
+        if (e.target) e.target.value = '';
+      }
+    };
+    reader.readAsText(file, 'ISO-8859-1');
+  };
+
   const handlePrintStudentsByClass = () => {
     if (classes.length === 0) {
       setFeedback({ message: 'Nenhuma turma cadastrada para gerar o relatório.', type: 'error' });
@@ -859,6 +1008,25 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-left">
+                  <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    <FileUp size={18} className="text-purple-600" />
+                    Importar Educacenso
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-4">
+                    Importe dados de turmas, alunos e professores a partir do arquivo exportado pelo Educacenso (.txt).
+                  </p>
+                  <label className="block w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-all shadow-sm text-center cursor-pointer">
+                    <input
+                      type="file"
+                      accept=".txt"
+                      onChange={handleImportEducacenso}
+                      className="hidden"
+                    />
+                    Selecionar Arquivo .txt
+                  </label>
+                </div>
+
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-left">
                   <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
                     <Download size={18} className="text-emerald-600" />

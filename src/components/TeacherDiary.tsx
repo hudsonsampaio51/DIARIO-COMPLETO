@@ -56,10 +56,14 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
 
   useEffect(() => {
     const fetchTeacherProfile = async () => {
-      if (!teacherId) return;
+      const targetId = (role === 'admin' || role === 'supervisor') && filterTeacherId ? filterTeacherId : teacherId;
+      if (!targetId) {
+        setTeacherProfile(null);
+        return;
+      }
       try {
         // 1. Try direct lookup by ID (if Auth UID matches Staff ID)
-        const docRef = doc(db, 'staff', teacherId);
+        const docRef = doc(db, 'staff', targetId);
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists() && (!schoolId || docSnap.data()?.schoolId === schoolId)) {
@@ -68,7 +72,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         }
 
         // 2. Try lookup by email from users collection
-        const userDoc = await getDoc(doc(db, 'users', teacherId));
+        const userDoc = await getDoc(doc(db, 'users', targetId));
         if (userDoc.exists()) {
           const userData = userDoc.data();
           const userEmail = userData.email?.toLowerCase();
@@ -87,7 +91,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             
             // If schoolId was missing in users, update it
             if (!userData.schoolId && staffData.schoolId) {
-              await updateDoc(doc(db, 'users', teacherId), { schoolId: staffData.schoolId });
+              await updateDoc(doc(db, 'users', targetId), { schoolId: staffData.schoolId });
             }
             return;
           }
@@ -111,12 +115,12 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             
             // If schoolId was missing in users, update it
             if (!userData.schoolId && staffData.schoolId) {
-              await updateDoc(doc(db, 'users', teacherId), { schoolId: staffData.schoolId });
+              await updateDoc(doc(db, 'users', targetId), { schoolId: staffData.schoolId });
             }
           } else {
             // Last resort: Create a temporary profile
             setTeacherProfile({ 
-              id: teacherId, 
+              id: targetId, 
               firstName: userData.name.split(' ')[0], 
               lastName: userData.name.split(' ').slice(1).join(' '),
               email: userData.email,
@@ -130,7 +134,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       }
     };
     fetchTeacherProfile();
-  }, [teacherId, schoolId]);
+  }, [teacherId, schoolId, filterTeacherId, role]);
 
   useEffect(() => {
     const fetchClasses = async () => {
@@ -913,6 +917,19 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
     return `${numbers.join('/')} BIMESTRE`.toUpperCase();
   };
 
+  const currentTeacherName = (() => {
+    const currentSubject = subjects.find(s => s.id === selectedSubjectId);
+    if (currentSubject?.teacherId) {
+      const prof = allStaff.find(s => s.id === currentSubject.teacherId);
+      if (prof) return `${prof.firstName} ${prof.lastName || ''}`.trim();
+    }
+    if (selectedClass?.teacherId) {
+      const prof = allStaff.find(s => s.id === selectedClass.teacherId);
+      if (prof) return `${prof.firstName} ${prof.lastName || ''}`.trim();
+    }
+    return teacherProfile ? `${teacherProfile.firstName} ${teacherProfile.lastName || ''}`.trim() : '---';
+  })();
+
   return (
     <div className="p-8 relative">
       {loadingData && (
@@ -1097,14 +1114,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Professor (a)</p>
               <p className="font-bold text-slate-700">
-                {(() => {
-                  const currentSubject = subjects.find(s => s.id === selectedSubjectId);
-                  if (currentSubject?.teacherId) {
-                    const prof = allStaff.find(s => s.id === currentSubject.teacherId);
-                    return prof ? `${prof.firstName} ${prof.lastName || ''}`.trim() : '---';
-                  }
-                  return teacherProfile ? `${teacherProfile.firstName} ${teacherProfile.lastName || ''}`.trim() : 'Carregando...';
-                })()}
+                {currentTeacherName}
               </p>
             </div>
             <div>
@@ -1689,13 +1699,6 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
 
         const totalWorkload = subjects.reduce((acc, s) => acc + (s.workload || 0), 0);
         const currentSubject = subjects.find(s => s.id === selectedSubjectId);
-        const currentTeacherName = (() => {
-          if (currentSubject?.teacherId) {
-            const prof = allStaff.find(s => s.id === currentSubject.teacherId);
-            return prof ? `${prof.firstName} ${prof.lastName}` : '---';
-          }
-          return teacherProfile ? `${teacherProfile.firstName} ${teacherProfile.lastName}` : '---';
-        })();
 
         return (
           <div ref={printRef} className="hidden print:block bg-white p-0 text-slate-900 w-full">
