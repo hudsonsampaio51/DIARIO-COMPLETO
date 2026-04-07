@@ -1847,21 +1847,27 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                 </tbody>
               </table>
 
-              <div className="mt-4 flex justify-between items-end text-[8px] px-4">
+              <div className="mt-4 text-center text-[8px] mb-8">
+                <p>
+                  Ji-Paraná, {filteredSessions.length > 0 
+                    ? new Date(filteredSessions[filteredSessions.length - 1].date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+                    : new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+                  }
+                </p>
+              </div>
+              <div className="flex justify-between items-end text-[8px] px-4">
                 <div className="text-center">
                   <div className="w-48 border-t border-slate-900 mb-1"></div>
                   <p>{currentTeacherName}</p>
                   <p className="font-bold">PROFESSOR (A)</p>
                 </div>
                 <div className="text-center">
-                  <p className="mb-8">
-                    Ji-Paraná, {filteredSessions.length > 0 
-                      ? new Date(filteredSessions[filteredSessions.length - 1].date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-                      : new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-                    }
-                  </p>
                   <div className="w-48 border-t border-slate-900 mb-1"></div>
-                  <p className="font-bold">DIREÇÃO / COORDENAÇÃO</p>
+                  <p className="font-bold">VISTO DA SUPERVISÃO</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-48 border-t border-slate-900 mb-1"></div>
+                  <p className="font-bold">VISTO DA DIREÇÃO</p>
                 </div>
               </div>
             </div>
@@ -1918,21 +1924,27 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                 </tbody>
               </table>
 
-              <div className="mt-12 flex justify-around text-[9px]">
+              <div className="mt-8 text-center text-[9px] mb-12">
+                <p>
+                  Ji-Paraná, {filteredSessions.length > 0 
+                    ? new Date(filteredSessions[filteredSessions.length - 1].date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+                    : new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+                  }
+                </p>
+              </div>
+              <div className="flex justify-between px-4 text-[9px]">
                 <div className="text-center">
                   <div className="w-56 border-t border-slate-900 mb-1"></div>
                   <p>{currentTeacherName}</p>
                   <p>Assinatura do Professor</p>
                 </div>
                 <div className="text-center">
-                  <p className="mb-8">
-                    Ji-Paraná, {filteredSessions.length > 0 
-                      ? new Date(filteredSessions[filteredSessions.length - 1].date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-                      : new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-                    }
-                  </p>
                   <div className="w-56 border-t border-slate-900 mb-1"></div>
                   <p>Visto da Supervisão</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-56 border-t border-slate-900 mb-1"></div>
+                  <p>Visto da Direção</p>
                 </div>
               </div>
             </div>
@@ -2017,16 +2029,22 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                 </tbody>
               </table>
 
-              <div className="mt-12 flex justify-between items-end px-8">
+              <div className="mt-8 text-center text-sm mb-12">
+                <p>Ji-Paraná, {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+              </div>
+              <div className="flex justify-between items-end px-4">
                 <div className="text-center">
-                  <div className="w-64 border-t border-slate-900 mb-1"></div>
+                  <div className="w-56 border-t border-slate-900 mb-1"></div>
                   <p className="text-sm">{currentTeacherName}</p>
                   <p className="text-[10px] font-bold uppercase">Professor (a)</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm mb-12">Ji-Paraná, {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-                  <div className="w-64 border-t border-slate-900 mb-1"></div>
-                  <p className="text-[10px] font-bold uppercase">Direção / Coordenação</p>
+                  <div className="w-56 border-t border-slate-900 mb-1"></div>
+                  <p className="text-[10px] font-bold uppercase">Visto da Supervisão</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-56 border-t border-slate-900 mb-1"></div>
+                  <p className="text-[10px] font-bold uppercase">Visto da Direção</p>
                 </div>
               </div>
             </div>
