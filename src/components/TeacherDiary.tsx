@@ -1546,7 +1546,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                     />
                                   </td>
                                   <td className="px-1 py-2 text-center text-xs font-bold bg-slate-100 border border-slate-200">
-                                    {grade.value?.toFixed(1) || '0.0'}
+                                    {grade.value !== undefined ? grade.value.toFixed(2).replace('.', ',') : '0,00'}
                                   </td>
                                 </Fragment>
                               );
@@ -1630,7 +1630,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                   onChange={e => updateGrade(student.id, 'homeworkGrade', e.target.value)}
                                 />
                                 <div className="w-14 px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-center text-xs font-bold flex items-center justify-center">
-                                  {grades[student.id]?.value?.toFixed(1) || '0.0'}
+                                  {grades[student.id]?.value !== undefined ? grades[student.id]?.value.toFixed(2).replace('.', ',') : '0,00'}
                                 </div>
                               </div>
                             </div>
@@ -1701,7 +1701,8 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         const currentSubject = subjects.find(s => s.id === selectedSubjectId);
 
         return (
-          <div ref={printRef} className="hidden print:block bg-white p-0 text-slate-900 w-full">
+          <>
+            <div ref={printRef} className="hidden print:block bg-white p-0 text-slate-900 w-full">
             {/* Page 1: Frequency */}
             <div className="page-break-after-always p-2">
             <div className="border-2 border-slate-900 p-1">
@@ -1866,98 +1867,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             </div>
           </div>
 
-          <div ref={printGradesRef} className="hidden print:block bg-white p-0 text-slate-900 w-full">
-            <div className="p-4">
-              <div className="flex items-center gap-4 mb-6 border-b-2 border-slate-900 pb-4">
-                <img 
-                  src={school?.logoUrl || 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Bras%C3%A3o_de_Ji-Paran%C3%A1.png/200px-Bras%C3%A3o_de_Ji-Paran%C3%A1.png'} 
-                  alt={school?.name || 'Brasão'} 
-                  className="h-16 w-auto object-contain"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="header-info">
-                  <h1 className="text-xl font-black uppercase">{school?.name || '---'}</h1>
-                  <p className="text-sm font-bold uppercase">{selectedClass?.educationLevel || 'ENSINO FUNDAMENTAL'}</p>
-                  <div className="text-[10px] mt-1">
-                    <p>TURMA: {selectedClass?.name} ({selectedClass?.grade}) - TURNO: {selectedClass?.shift}</p>
-                    <p>DISCIPLINA: {subjects.find(s => s.id === selectedSubjectId)?.name || '---'}</p>
-                    <p>PROFESSOR(A): {currentTeacherName}</p>
-                    <p className="font-bold mt-1">{period.toUpperCase()}</p>
-                  </div>
-                </div>
-              </div>
 
-              <h2 className="text-center text-lg font-black uppercase mb-4">Ficha de Notas</h2>
-
-              <table className="w-full border-collapse border border-slate-900 text-[10px]">
-                <thead>
-                  <tr className="bg-slate-100">
-                    <th className="border border-slate-900 p-2 text-left w-10">Nº</th>
-                    <th className="border border-slate-900 p-2 text-left">ALUNO</th>
-                    <th className="border border-slate-900 p-2 w-16">ESCRITA 1</th>
-                    <th className="border border-slate-900 p-2 w-16">ESCRITA 2</th>
-                    {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
-                      <>
-                        <th className="border border-slate-900 p-2 w-16">PROJETO</th>
-                        <th className="border border-slate-900 p-2 w-16">ATIV. ORAL</th>
-                        <th className="border border-slate-900 p-2 w-16">CADERNO</th>
-                      </>
-                    ) : (
-                      <>
-                        <th className="border border-slate-900 p-2 w-16">CADERNO</th>
-                        <th className="border border-slate-900 p-2 w-16">TAREFA</th>
-                      </>
-                    )}
-                    <th className="border border-slate-900 p-2 w-16">TOTAL</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((student, idx) => {
-                    const grade = selectedClass?.educationLevel === 'Ensino Fundamental I' 
-                      ? (consolidatedGrades[student.id]?.[selectedSubjectId] || {})
-                      : (grades[student.id] || {});
-                    
-                    return (
-                      <tr key={student.id}>
-                        <td className="border border-slate-900 p-2 text-center">{idx + 1}</td>
-                        <td className="border border-slate-900 p-2 text-left uppercase font-medium">
-                          {(student as any).name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Sem Nome'}
-                        </td>
-                        <td className="border border-slate-900 p-2">{grade.writtenActivity1 !== undefined ? grade.writtenActivity1.toFixed(1) : '-'}</td>
-                        <td className="border border-slate-900 p-2">{grade.writtenActivity2 !== undefined ? grade.writtenActivity2.toFixed(1) : '-'}</td>
-                        {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
-                          <>
-                            <td className="border border-slate-900 p-2">{grade.projectGrade !== undefined ? grade.projectGrade.toFixed(1) : '-'}</td>
-                            <td className="border border-slate-900 p-2">{grade.oralActivityGrade !== undefined ? grade.oralActivityGrade.toFixed(1) : '-'}</td>
-                            <td className="border border-slate-900 p-2">{grade.notebookGrade !== undefined ? grade.notebookGrade.toFixed(1) : '-'}</td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="border border-slate-900 p-2">{grade.notebookGrade !== undefined ? grade.notebookGrade.toFixed(1) : '-'}</td>
-                            <td className="border border-slate-900 p-2">{grade.homeworkGrade !== undefined ? grade.homeworkGrade.toFixed(1) : '-'}</td>
-                          </>
-                        )}
-                        <td className="border border-slate-900 p-2 font-bold">{grade.value !== undefined ? grade.value.toFixed(1) : '0.0'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              <div className="mt-12 flex justify-between items-end px-8">
-                <div className="text-center">
-                  <div className="w-64 border-t border-slate-900 mb-1"></div>
-                  <p className="text-sm">{currentTeacherName}</p>
-                  <p className="text-[10px] font-bold uppercase">Professor (a)</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm mb-12">Ji-Paraná, {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-                  <div className="w-64 border-t border-slate-900 mb-1"></div>
-                  <p className="text-[10px] font-bold uppercase">Direção / Coordenação</p>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Page 2: Content */}
           <div className="min-h-screen p-4 mt-8">
@@ -2027,7 +1937,101 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
               </div>
             </div>
           </div>
-        </div>
+          </div>
+          
+          <div ref={printGradesRef} className="hidden print:block bg-white p-0 text-slate-900 w-full">
+            <div className="p-4">
+              <div className="flex items-center gap-4 mb-6 border-b-2 border-slate-900 pb-4">
+                <img 
+                  src={school?.logoUrl || 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Bras%C3%A3o_de_Ji-Paran%C3%A1.png/200px-Bras%C3%A3o_de_Ji-Paran%C3%A1.png'} 
+                  alt={school?.name || 'Brasão'} 
+                  className="h-16 w-auto object-contain"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="header-info">
+                  <h1 className="text-xl font-black uppercase">{school?.name || '---'}</h1>
+                  <p className="text-sm font-bold uppercase">{selectedClass?.educationLevel || 'ENSINO FUNDAMENTAL'}</p>
+                  <div className="text-[10px] mt-1">
+                    <p>TURMA: {selectedClass?.name} ({selectedClass?.grade}) - TURNO: {selectedClass?.shift}</p>
+                    <p>DISCIPLINA: {subjects.find(s => s.id === selectedSubjectId)?.name || '---'}</p>
+                    <p>PROFESSOR(A): {currentTeacherName}</p>
+                    <p className="font-bold mt-1">{period.toUpperCase()}</p>
+                  </div>
+                </div>
+              </div>
+
+              <h2 className="text-center text-lg font-black uppercase mb-4">Ficha de Notas</h2>
+
+              <table className="w-full border-collapse border border-slate-900 text-[10px]">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="border border-slate-900 p-2 text-left w-10">Nº</th>
+                    <th className="border border-slate-900 p-2 text-left">ALUNO</th>
+                    <th className="border border-slate-900 p-2 w-16">ESCRITA 1</th>
+                    <th className="border border-slate-900 p-2 w-16">ESCRITA 2</th>
+                    {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
+                      <>
+                        <th className="border border-slate-900 p-2 w-16">PROJETO</th>
+                        <th className="border border-slate-900 p-2 w-16">ATIV. ORAL</th>
+                        <th className="border border-slate-900 p-2 w-16">CADERNO</th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="border border-slate-900 p-2 w-16">CADERNO</th>
+                        <th className="border border-slate-900 p-2 w-16">TAREFA</th>
+                      </>
+                    )}
+                    <th className="border border-slate-900 p-2 w-16">TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((student, idx) => {
+                    const grade = selectedClass?.educationLevel === 'Ensino Fundamental I' 
+                      ? (consolidatedGrades[student.id]?.[selectedSubjectId] || {})
+                      : (grades[student.id] || {});
+                    
+                    return (
+                      <tr key={student.id}>
+                        <td className="border border-slate-900 p-2 text-center">{idx + 1}</td>
+                        <td className="border border-slate-900 p-2 text-left uppercase font-medium">
+                          {(student as any).name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Sem Nome'}
+                        </td>
+                        <td className="border border-slate-900 p-2">{grade.writtenActivity1 !== undefined ? grade.writtenActivity1.toFixed(2).replace('.', ',') : '-'}</td>
+                        <td className="border border-slate-900 p-2">{grade.writtenActivity2 !== undefined ? grade.writtenActivity2.toFixed(2).replace('.', ',') : '-'}</td>
+                        {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
+                          <>
+                            <td className="border border-slate-900 p-2">{grade.projectGrade !== undefined ? grade.projectGrade.toFixed(2).replace('.', ',') : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.oralActivityGrade !== undefined ? grade.oralActivityGrade.toFixed(2).replace('.', ',') : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.notebookGrade !== undefined ? grade.notebookGrade.toFixed(2).replace('.', ',') : '-'}</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="border border-slate-900 p-2">{grade.notebookGrade !== undefined ? grade.notebookGrade.toFixed(2).replace('.', ',') : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.homeworkGrade !== undefined ? grade.homeworkGrade.toFixed(2).replace('.', ',') : '-'}</td>
+                          </>
+                        )}
+                        <td className="border border-slate-900 p-2 font-bold">{grade.value !== undefined ? grade.value.toFixed(2).replace('.', ',') : '0,00'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div className="mt-12 flex justify-between items-end px-8">
+                <div className="text-center">
+                  <div className="w-64 border-t border-slate-900 mb-1"></div>
+                  <p className="text-sm">{currentTeacherName}</p>
+                  <p className="text-[10px] font-bold uppercase">Professor (a)</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm mb-12">Ji-Paraná, {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                  <div className="w-64 border-t border-slate-900 mb-1"></div>
+                  <p className="text-[10px] font-bold uppercase">Direção / Coordenação</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          </>
         );
       })()}
 
