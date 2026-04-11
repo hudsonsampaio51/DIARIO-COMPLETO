@@ -46,7 +46,26 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
       try {
         const qStudents = query(collection(db, 'students'), where('schoolId', '==', schoolId));
         const studentsSnap = await getDocs(qStudents);
-        setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Student)));
+        const fetchedStudents = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Student));
+        
+        fetchedStudents.sort((a, b) => {
+          const numA = a.studentNumber ? parseInt(a.studentNumber, 10) : NaN;
+          const numB = b.studentNumber ? parseInt(b.studentNumber, 10) : NaN;
+          
+          if (!isNaN(numA) && !isNaN(numB)) {
+            if (numA !== numB) return numA - numB;
+          } else if (!isNaN(numA)) {
+            return -1;
+          } else if (!isNaN(numB)) {
+            return 1;
+          }
+          
+          const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase();
+          const nameB = `${b.firstName} ${b.lastName}`.trim().toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+        
+        setStudents(fetchedStudents);
         
         const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
         const classesSnap = await getDocs(qClasses);
@@ -157,6 +176,20 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
     }
   };
 
+  const roundAverage = (value: number): number => {
+    const integerPart = Math.floor(value);
+    const decimalPart = value - integerPart;
+    const d = Math.round(decimalPart * 100) / 100;
+
+    if (d < 0.30) {
+      return integerPart;
+    } else if (d < 0.80) {
+      return integerPart + 0.5;
+    } else {
+      return integerPart + 1.0;
+    }
+  };
+
   const filteredStudents = students.filter(s => {
     const fullName = `${s.firstName || ''} ${s.lastName || ''}`.toLowerCase();
     const regNumber = (s.registrationNumber || '').toLowerCase();
@@ -254,7 +287,8 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                   const f4 = data.absences['4º Bimestre'] || 0;
                   
                   const count = [b1, b2, b3, b4].filter(v => v > 0).length;
-                  const media = count > 0 ? (b1 + b2 + b3 + b4) / count : 0;
+                  const rawMedia = count > 0 ? (b1 + b2 + b3 + b4) / count : 0;
+                  const media = rawMedia > 0 ? roundAverage(rawMedia) : 0;
                   const fTotal = (data.absences['Total'] || 0) + f1 + f2 + f3 + f4;
 
                   return (
@@ -262,28 +296,28 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                       <td className="py-4 font-semibold text-slate-800">{subjectName}</td>
                       <td className="py-4 text-center text-slate-500 font-medium">{data.workload ? `${data.workload}h` : '-'}</td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b1 > 0 ? b1.toFixed(1) : '-'}</span>
+                        <span className="font-bold">{b1 > 0 ? b1.toFixed(2).replace('.', ',') : '-'}</span>
                         <span className="mx-1 text-slate-300">|</span>
                         <span className="text-red-500 text-sm">{f1 > 0 ? f1 : '-'}</span>
                       </td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b2 > 0 ? b2.toFixed(1) : '-'}</span>
+                        <span className="font-bold">{b2 > 0 ? b2.toFixed(2).replace('.', ',') : '-'}</span>
                         <span className="mx-1 text-slate-300">|</span>
-                        <span className="text-red-500 text-sm">{f1 > 0 ? f2 : '-'}</span>
+                        <span className="text-red-500 text-sm">{f2 > 0 ? f2 : '-'}</span>
                       </td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b3 > 0 ? b3.toFixed(1) : '-'}</span>
+                        <span className="font-bold">{b3 > 0 ? b3.toFixed(2).replace('.', ',') : '-'}</span>
                         <span className="mx-1 text-slate-300">|</span>
                         <span className="text-red-500 text-sm">{f3 > 0 ? f3 : '-'}</span>
                       </td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b4 > 0 ? b4.toFixed(1) : '-'}</span>
+                        <span className="font-bold">{b4 > 0 ? b4.toFixed(2).replace('.', ',') : '-'}</span>
                         <span className="mx-1 text-slate-300">|</span>
                         <span className="text-red-500 text-sm">{f4 > 0 ? f4 : '-'}</span>
                       </td>
                       <td className="py-4 text-center">
                         <span className={`px-3 py-1 rounded-full font-bold ${media >= 6 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                          {media > 0 ? media.toFixed(1) : '-'}
+                          {media > 0 ? media.toFixed(2).replace('.', ',') : '-'}
                         </span>
                       </td>
                       <td className="py-4 text-center font-bold text-slate-600">
@@ -306,13 +340,13 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
               <div>
                 <p className="text-sm text-slate-500 font-medium">Média Geral</p>
                 <p className="text-3xl font-bold text-slate-900">
-                  {(studentGrades.reduce((acc, g) => acc + g.value, 0) / studentGrades.length).toFixed(1)}
+                  {roundAverage(studentGrades.reduce((acc, g) => acc + g.value, 0) / studentGrades.length).toFixed(2).replace('.', ',')}
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-slate-500 font-medium">Status Final</p>
-                <p className={`text-xl font-bold ${studentGrades.reduce((acc, g) => acc + g.value, 0) / studentGrades.length >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  {studentGrades.reduce((acc, g) => acc + g.value, 0) / studentGrades.length >= 6 ? 'APROVADO' : 'EM RECUPERAÇÃO'}
+                <p className={`text-xl font-bold ${roundAverage(studentGrades.reduce((acc, g) => acc + g.value, 0) / studentGrades.length) >= 6 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {roundAverage(studentGrades.reduce((acc, g) => acc + g.value, 0) / studentGrades.length) >= 6 ? 'APROVADO' : 'EM RECUPERAÇÃO'}
                 </p>
               </div>
             </div>
@@ -366,7 +400,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                 className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-semibold shadow-md"
               >
                 <Printer size={18} />
-                Imprimir Todos da Turma
+                Imprimir Turma Completa
               </button>
             )}
             {selectedStudent && (
