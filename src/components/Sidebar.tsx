@@ -33,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role 
     <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-full">
       <div className="p-6 flex items-center gap-3 border-b border-slate-800">
         <BookOpen className="text-emerald-500 w-8 h-8" />
-        <span className="text-xl font-bold text-white tracking-tight">SIDEBAR TESTE</span>
+        <span className="text-xl font-bold text-white tracking-tight">SISESCOLAR</span>
       </div>
       
       <nav className="flex-1 p-4 space-y-2">
