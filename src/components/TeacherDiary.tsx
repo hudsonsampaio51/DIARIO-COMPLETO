@@ -230,6 +230,24 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
           ]);
 
           const fetchedStudents = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Student));
+          
+          fetchedStudents.sort((a, b) => {
+            const numA = a.studentNumber ? parseInt(a.studentNumber, 10) : NaN;
+            const numB = b.studentNumber ? parseInt(b.studentNumber, 10) : NaN;
+            
+            if (!isNaN(numA) && !isNaN(numB)) {
+              if (numA !== numB) return numA - numB;
+            } else if (!isNaN(numA)) {
+              return -1;
+            } else if (!isNaN(numB)) {
+              return 1;
+            }
+            
+            const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase();
+            const nameB = `${b.firstName} ${b.lastName}`.trim().toLowerCase();
+            return nameA.localeCompare(nameB);
+          });
+
           const fetchedSubjects = subjectsSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Subject));
           const fetchedOccurrences = occurrencesSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Occurrence));
 
