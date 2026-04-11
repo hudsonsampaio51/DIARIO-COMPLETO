@@ -20,7 +20,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role }) => {
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'secretary', 'teacher', 'superadmin'] },
+    { id: 'dashboard', label: 'Painel', icon: LayoutDashboard, roles: ['admin', 'secretary', 'teacher', 'superadmin'] },
     { id: 'superadmin', label: 'Super Admin', icon: ShieldCheck, roles: ['superadmin'] },
     { id: 'secretary', label: 'Secretaria', icon: School, roles: ['admin', 'secretary'] },
     { id: 'supervisor', label: 'Supervisor', icon: Users, roles: ['admin', 'supervisor'] },
