@@ -27,6 +27,7 @@ interface SecretaryProps {
 
 export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
   const [activeSubTab, setActiveSubTab] = useState<'students' | 'teachers' | 'staff' | 'classes' | 'users' | 'school' | 'backup'>('students');
+  const [searchTerm, setSearchTerm] = useState('');
   const [students, setStudents] = useState<Student[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -1092,9 +1093,19 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
             </div>
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead className="bg-slate-50 border-b border-slate-100">
-              <tr>
+          <div>
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder={`Buscar em ${activeSubTab === 'students' ? 'Alunos' : activeSubTab === 'teachers' ? 'Professores' : activeSubTab === 'staff' ? 'Funcionários' : activeSubTab === 'users' ? 'Usuários' : 'Turmas'}...`}
+                className="w-full max-w-md px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
                 <th className="px-6 py-4 text-sm font-semibold text-slate-600">Nome</th>
                 {activeSubTab === 'classes' ? (
                   <>
@@ -1113,7 +1124,9 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {activeSubTab === 'students' && students.map(student => (
+              {activeSubTab === 'students' && students.filter(student => 
+                `${student.firstName} ${student.lastName} ${student.registrationNumber || ''} ${student.cpf || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map(student => (
                 <tr key={student.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900">
                     {student.firstName || student.lastName 
@@ -1128,7 +1141,9 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                   </td>
                 </tr>
               ))}
-              {activeSubTab === 'teachers' && staff.filter(s => s.role === 'Professor').map(member => (
+              {activeSubTab === 'teachers' && staff.filter(s => s.role === 'Professor' && 
+                `${s.firstName} ${s.lastName} ${s.cpf || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map(member => (
                 <tr key={member.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900">
                     {member.firstName || member.lastName 
@@ -1143,7 +1158,9 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                   </td>
                 </tr>
               ))}
-              {activeSubTab === 'staff' && staff.filter(s => s.role !== 'Professor').map(member => (
+              {activeSubTab === 'staff' && staff.filter(s => s.role !== 'Professor' && 
+                `${s.firstName} ${s.lastName} ${s.cpf || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map(member => (
                 <tr key={member.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900">
                     {member.firstName || member.lastName 
@@ -1158,7 +1175,9 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                   </td>
                 </tr>
               ))}
-              {activeSubTab === 'classes' && classes.map(cls => (
+              {activeSubTab === 'classes' && classes.filter(cls => 
+                `${cls.name} ${cls.grade} ${cls.shift}`.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map(cls => (
                 <tr key={cls.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900">
                     <div>{cls.name}</div>
@@ -1190,7 +1209,9 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
                   </td>
                 </tr>
               ))}
-              {activeSubTab === 'users' && users.map(u => (
+              {activeSubTab === 'users' && users.filter(u => 
+                `${u.name} ${u.email} ${u.role}`.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map(u => (
                 <tr key={u.uid || u.email} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900">{u.name}</td>
                   <td className="px-6 py-4 text-slate-500">{u.email}</td>
@@ -1212,6 +1233,7 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
