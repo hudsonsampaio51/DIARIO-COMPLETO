@@ -48,7 +48,26 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
       try {
         const qStudents = query(collection(db, 'students'), where('schoolId', '==', schoolId));
         const studentsSnap = await getDocs(qStudents);
-        setStudents(studentsSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Student)));
+        const fetchedStudents = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Student));
+        
+        fetchedStudents.sort((a, b) => {
+          const numA = a.studentNumber ? parseInt(a.studentNumber, 10) : NaN;
+          const numB = b.studentNumber ? parseInt(b.studentNumber, 10) : NaN;
+          
+          if (!isNaN(numA) && !isNaN(numB)) {
+            if (numA !== numB) return numA - numB;
+          } else if (!isNaN(numA)) {
+            return -1;
+          } else if (!isNaN(numB)) {
+            return 1;
+          }
+          
+          const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase();
+          const nameB = `${b.firstName} ${b.lastName}`.trim().toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+        
+        setStudents(fetchedStudents);
         
         const qClasses = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
         const classesSnap = await getDocs(qClasses);
@@ -172,6 +191,20 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
     return matchesSearch && matchesClass;
   });
 
+  const roundAverage = (value: number): number => {
+    const integerPart = Math.floor(value);
+    const decimalPart = value - integerPart;
+    const d = Math.round(decimalPart * 100) / 100;
+
+    if (d < 0.30) {
+      return integerPart;
+    } else if (d < 0.80) {
+      return integerPart + 0.5;
+    } else {
+      return integerPart + 1.0;
+    }
+  };
+
   const renderDocument = (student: Student, studentGrades: Grade[], studentAbsences: Record<string, Record<string, number>>, isBulk = false) => {
     return (
       <div key={student.id} className={`bg-white p-6 shadow-xl border border-slate-100 min-h-[800px] print:shadow-none print:border-none print:p-0 ${isBulk ? 'mb-8 page-break-after-always' : ''}`}>
@@ -278,7 +311,8 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                     return acc;
                   }, {} as Record<string, boolean>)), ...Object.keys(studentAbsences)])).map((subjectId) => {
                   const subjectGradesList = studentGrades.filter(g => (g.subjectId || 'default') === subjectId);
-                  const media = subjectGradesList.length > 0 ? subjectGradesList.reduce((acc, g) => acc + g.value, 0) / subjectGradesList.length : 0;
+                  const rawMedia = subjectGradesList.length > 0 ? subjectGradesList.reduce((acc, g) => acc + g.value, 0) / subjectGradesList.length : 0;
+                  const media = rawMedia > 0 ? roundAverage(rawMedia) : 0;
                   
                   const abs = (studentAbsences as any)[subjectId] || {};
                   const fTotal = Object.values(abs).reduce((sum: any, val: any) => sum + val, 0) as number;
@@ -288,7 +322,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                       <td className="border border-slate-900 p-2">{subjects[subjectId]?.name || 'Disciplina'}</td>
                       <td className="border border-slate-900 p-2 text-center">{subjects[subjectId]?.workload ? `${subjects[subjectId].workload}h` : '-'}</td>
                       <td className="border border-slate-900 p-2 text-center">Ano Letivo</td>
-                      <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(1) : '-'}</td>
+                      <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(2).replace('.', ',') : '-'}</td>
                       <td className="border border-slate-900 p-2 text-center font-bold">{fTotal}</td>
                       <td className="border border-slate-900 p-2 text-center font-bold">
                         {media >= 6 ? 'APROVADO' : media > 0 ? 'RECUPERAÇÃO' : '-'}
@@ -401,7 +435,8 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                     const f4 = data.absences['4º Bimestre'] || 0;
                     
                     const count = [b1, b2, b3, b4].filter(v => v > 0).length;
-                    const media = count > 0 ? (b1 + b2 + b3 + b4) / count : 0;
+                    const rawMedia = count > 0 ? (b1 + b2 + b3 + b4) / count : 0;
+                    const media = rawMedia > 0 ? roundAverage(rawMedia) : 0;
                     const fTotal = (data.absences['Total'] || 0) + f1 + f2 + f3 + f4;
 
                     return (
@@ -409,18 +444,18 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                         <td className="border border-slate-900 p-2 font-bold">{subjectName}</td>
                         <td className="border border-slate-900 p-2 text-center">{data.workload ? `${data.workload}h` : '-'}</td>
                         <td className="border border-slate-900 p-2 text-center">
-                          {b1 > 0 ? b1.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f1 > 0 ? f1 : '-'}</span>
+                          {b1 > 0 ? b1.toFixed(2).replace('.', ',') : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f1 > 0 ? f1 : '-'}</span>
                         </td>
                         <td className="border border-slate-900 p-2 text-center">
-                          {b2 > 0 ? b2.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f2 > 0 ? f2 : '-'}</span>
+                          {b2 > 0 ? b2.toFixed(2).replace('.', ',') : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f2 > 0 ? f2 : '-'}</span>
                         </td>
                         <td className="border border-slate-900 p-2 text-center">
-                          {b3 > 0 ? b3.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f3 > 0 ? f3 : '-'}</span>
+                          {b3 > 0 ? b3.toFixed(2).replace('.', ',') : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f3 > 0 ? f3 : '-'}</span>
                         </td>
                         <td className="border border-slate-900 p-2 text-center">
-                          {b4 > 0 ? b4.toFixed(1) : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f4 > 0 ? f4 : '-'}</span>
+                          {b4 > 0 ? b4.toFixed(2).replace('.', ',') : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f4 > 0 ? f4 : '-'}</span>
                         </td>
-                        <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(1) : '-'}</td>
+                        <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(2).replace('.', ',') : '-'}</td>
                         <td className="border border-slate-900 p-2 text-center font-bold">{fTotal}</td>
                       </tr>
                     );
@@ -508,7 +543,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                 className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all font-semibold shadow-md"
               >
                 <Printer size={18} />
-                Imprimir Todos da Turma
+                Imprimir Turma Completa
               </button>
             )}
             {selectedStudent && (
