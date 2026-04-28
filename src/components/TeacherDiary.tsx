@@ -518,24 +518,43 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
     const targetSubjectId = subjectId || selectedSubjectId;
     
     if (selectedClass?.educationLevel === 'Ensino Fundamental I') {
+      const targetSubject = subjects.find(s => s.id === targetSubjectId);
+      const isPortuguesa = targetSubject?.name?.toLowerCase().includes('portuguesa');
+      const isSharedGrade = ['projectGrade', 'oralActivityGrade', 'notebookGrade'].includes(field);
+
       setConsolidatedGrades(prev => {
         const studentGrades = prev[studentId] || {};
-        const currentGrade = studentGrades[targetSubjectId] || {};
-        const updatedGrade = { ...currentGrade, [field]: numValue };
+        let newStudentGrades = { ...studentGrades };
         
-        // Calculate total automatically
-        const total = (updatedGrade.writtenActivity1 || 0) + 
-                      (updatedGrade.writtenActivity2 || 0) + 
-                      (updatedGrade.projectGrade || 0) +
-                      (updatedGrade.oralActivityGrade || 0) +
-                      (updatedGrade.notebookGrade || 0);
+        if (isPortuguesa && isSharedGrade) {
+          subjects.forEach(sub => {
+            const currentSubGrade = studentGrades[sub.id] || {};
+            const updatedSubGrade = { ...currentSubGrade, [field]: numValue };
+            
+            const total = (updatedSubGrade.writtenActivity1 || 0) + 
+                          (updatedSubGrade.writtenActivity2 || 0) + 
+                          (updatedSubGrade.projectGrade || 0) +
+                          (updatedSubGrade.oralActivityGrade || 0) +
+                          (updatedSubGrade.notebookGrade || 0);
+                          
+            newStudentGrades[sub.id] = { ...updatedSubGrade, value: total };
+          });
+        } else {
+          const currentGrade = studentGrades[targetSubjectId] || {};
+          const updatedGrade = { ...currentGrade, [field]: numValue };
+          
+          const total = (updatedGrade.writtenActivity1 || 0) + 
+                        (updatedGrade.writtenActivity2 || 0) + 
+                        (updatedGrade.projectGrade || 0) +
+                        (updatedGrade.oralActivityGrade || 0) +
+                        (updatedGrade.notebookGrade || 0);
+          
+          newStudentGrades[targetSubjectId] = { ...updatedGrade, value: total };
+        }
         
         return {
           ...prev,
-          [studentId]: {
-            ...studentGrades,
-            [targetSubjectId]: { ...updatedGrade, value: total }
-          }
+          [studentId]: newStudentGrades
         };
       });
     } else {
