@@ -520,7 +520,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
     if (selectedClass?.educationLevel === 'Ensino Fundamental I') {
       const targetSubject = subjects.find(s => s.id === targetSubjectId);
       const isPortuguesa = targetSubject?.name?.toLowerCase().includes('portuguesa');
-      const isSharedGrade = ['projectGrade', 'notebookGrade'].includes(field);
+      const isSharedGrade = ['writtenActivity2', 'projectGrade', 'oralActivityGrade', 'notebookGrade'].includes(field);
 
       setConsolidatedGrades(prev => {
         const studentGrades = prev[studentId] || {};
@@ -534,6 +534,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             const total = (updatedSubGrade.writtenActivity1 || 0) + 
                           (updatedSubGrade.writtenActivity2 || 0) + 
                           (updatedSubGrade.projectGrade || 0) +
+                          (updatedSubGrade.oralActivityGrade || 0) +
                           (updatedSubGrade.notebookGrade || 0);
                           
             newStudentGrades[sub.id] = { ...updatedSubGrade, value: total };
@@ -545,6 +546,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
           const total = (updatedGrade.writtenActivity1 || 0) + 
                         (updatedGrade.writtenActivity2 || 0) + 
                         (updatedGrade.projectGrade || 0) +
+                        (updatedGrade.oralActivityGrade || 0) +
                         (updatedGrade.notebookGrade || 0);
           
           newStudentGrades[targetSubjectId] = { ...updatedGrade, value: total };
@@ -1428,11 +1430,25 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                             <tr>
                               {subjects.map(subject => (
                                 <Fragment key={`sub-header-${subject.id}`}>
-                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]">E1</th>
-                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]">E2</th>
-                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]">CAD</th>
-                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]">TAR</th>
-                                  <th className="px-1 py-2 text-center text-[9px] font-bold text-emerald-700 uppercase border border-slate-200 bg-emerald-50 min-w-[40px]">TOT</th>
+                                  {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
+                                    <>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Atividade Escrita">AE</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Leitura/Produção">LP</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Participação Consciente">PC</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Tarefa de Casa">TC</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Atividades Integradoras">AI</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-emerald-700 uppercase border border-slate-200 bg-emerald-50 min-w-[40px]">MB</th>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Atividade Escrita">AE</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Prova Escrita">PE</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Projeto">PR</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Atividade Oral">AO</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-slate-500 uppercase border border-slate-200 bg-slate-50 min-w-[40px]" title="Caderno">CA</th>
+                                      <th className="px-1 py-2 text-center text-[9px] font-bold text-emerald-700 uppercase border border-slate-200 bg-emerald-50 min-w-[40px]">MB</th>
+                                    </>
+                                  )}
                                 </Fragment>
                               ))}
                             </tr>
@@ -1462,12 +1478,13 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                             <th className={`px-6 py-4 text-sm font-semibold text-slate-600 text-center ${mode === 'grades' ? 'w-[400px]' : mode === 'attendance' ? 'w-64' : 'w-32'}`}>
                               {mode === 'attendance' ? <span>Presença</span> : mode === 'grades' ? (
                                 selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
-                                  <div className="grid grid-cols-5 gap-2 text-[10px] uppercase font-bold text-center">
-                                    <span title="Escrita 1">ESCRITA 1</span>
-                                    <span title="Escrita 2">ESCRITA 2</span>
-                                    <span title="Caderno">CADERNO</span>
-                                    <span title="Tarefa">TAREFA</span>
-                                    <span title="Nota Total">TOTAL</span>
+                                  <div className="grid grid-cols-6 gap-2 text-[10px] uppercase font-bold text-center">
+                                    <span title="Atividade Escrita">AE</span>
+                                    <span title="Leitura/Produção">LP</span>
+                                    <span title="Participação Consciente">PC</span>
+                                    <span title="Tarefa de Casa">TC</span>
+                                    <span title="Atividades Integradoras">AI</span>
+                                    <span title="Média Bimestral">MB</span>
                                   </div>
                                 ) : (
                                   <div className="grid grid-cols-6 gap-2 text-[10px] uppercase font-bold">
@@ -1563,9 +1580,9 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                       max="10"
                                       step="0.1"
                                       className="w-full h-10 px-1 text-center text-xs outline-none focus:bg-emerald-50 disabled:bg-slate-50 disabled:text-slate-400"
-                                      value={grade.notebookGrade || ''}
+                                      value={grade.oralActivityGrade || ''}
                                       disabled={isTransferred}
-                                      onChange={e => updateGrade(student.id, 'notebookGrade', e.target.value, subject.id)}
+                                      onChange={e => updateGrade(student.id, 'oralActivityGrade', e.target.value, subject.id)}
                                     />
                                   </td>
                                   <td className="p-0 border border-slate-200">
@@ -1575,9 +1592,9 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                       max="10"
                                       step="0.1"
                                       className="w-full h-10 px-1 text-center text-xs outline-none focus:bg-emerald-50 disabled:bg-slate-50 disabled:text-slate-400"
-                                      value={grade.projectGrade || ''}
+                                      value={grade.notebookGrade || ''}
                                       disabled={isTransferred}
-                                      onChange={e => updateGrade(student.id, 'projectGrade', e.target.value, subject.id)}
+                                      onChange={e => updateGrade(student.id, 'notebookGrade', e.target.value, subject.id)}
                                     />
                                   </td>
                                   <td className="px-1 py-2 text-center text-xs font-bold bg-slate-100 border border-slate-200">
@@ -1620,13 +1637,13 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                           ) : (
                             <div className="flex justify-center">
                               {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
-                                <div className="grid grid-cols-5 gap-2">
+                                <div className="grid grid-cols-6 gap-2">
                                   <input
                                     type="number"
                                     min="0"
                                     max="10"
                                     step="0.1"
-                                    placeholder="E1"
+                                    placeholder="AE"
                                     disabled={isTransferred}
                                     className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
                                     value={grades[student.id]?.writtenActivity1 || ''}
@@ -1637,7 +1654,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                     min="0"
                                     max="10"
                                     step="0.1"
-                                    placeholder="E2"
+                                    placeholder="LP"
                                     disabled={isTransferred}
                                     className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
                                     value={grades[student.id]?.writtenActivity2 || ''}
@@ -1648,22 +1665,33 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                     min="0"
                                     max="10"
                                     step="0.1"
-                                    placeholder="CAD"
+                                    placeholder="PC"
                                     disabled={isTransferred}
                                     className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
-                                    value={grades[student.id]?.notebookGrade || ''}
-                                    onChange={e => updateGrade(student.id, 'notebookGrade', e.target.value)}
+                                    value={grades[student.id]?.projectGrade || ''}
+                                    onChange={e => updateGrade(student.id, 'projectGrade', e.target.value)}
                                   />
                                   <input
                                     type="number"
                                     min="0"
                                     max="10"
                                     step="0.1"
-                                    placeholder="TAR"
+                                    placeholder="TC"
                                     disabled={isTransferred}
                                     className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
-                                    value={grades[student.id]?.projectGrade || ''}
-                                    onChange={e => updateGrade(student.id, 'projectGrade', e.target.value)}
+                                    value={grades[student.id]?.oralActivityGrade || ''}
+                                    onChange={e => updateGrade(student.id, 'oralActivityGrade', e.target.value)}
+                                  />
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="10"
+                                    step="0.1"
+                                    placeholder="AI"
+                                    disabled={isTransferred}
+                                    className="w-14 px-2 py-1 rounded-lg border border-slate-200 text-center text-xs outline-none focus:ring-2 focus:ring-emerald-500 disabled:bg-slate-50 disabled:text-slate-400"
+                                    value={grades[student.id]?.notebookGrade || ''}
+                                    onChange={e => updateGrade(student.id, 'notebookGrade', e.target.value)}
                                   />
                                   <div className="w-14 px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-center text-xs font-bold flex items-center justify-center text-slate-800">
                                     {grades[student.id]?.value !== undefined ? grades[student.id]?.value.toFixed(2).replace('.', ',') : '0,00'}
@@ -2079,10 +2107,11 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                     <th className="border border-slate-900 p-2 text-left">ALUNO</th>
                     {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
                       <>
-                        <th className="border border-slate-900 p-2 w-16">ESCRITA 1</th>
-                        <th className="border border-slate-900 p-2 w-16">ESCRITA 2</th>
-                        <th className="border border-slate-900 p-2 w-16">CADERNO</th>
-                        <th className="border border-slate-900 p-2 w-16">TAREFA</th>
+                        <th className="border border-slate-900 p-2 w-16">AE</th>
+                        <th className="border border-slate-900 p-2 w-16">LP</th>
+                        <th className="border border-slate-900 p-2 w-16">PC</th>
+                        <th className="border border-slate-900 p-2 w-16">TC</th>
+                        <th className="border border-slate-900 p-2 w-16">AI</th>
                       </>
                     ) : (
                       <>
@@ -2110,15 +2139,18 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                         <td className="border border-slate-900 p-2 text-left uppercase font-medium">
                           {(student as any).name || `${student.firstName || ''} ${student.lastName || ''}`.trim() || 'Sem Nome'}
                         </td>
-                        <td className="border border-slate-900 p-2">{grade.writtenActivity1 !== undefined ? grade.writtenActivity1.toFixed(2).replace('.', ',') : '-'}</td>
-                        <td className="border border-slate-900 p-2">{grade.writtenActivity2 !== undefined ? grade.writtenActivity2.toFixed(2).replace('.', ',') : '-'}</td>
                         {selectedClass?.educationLevel === 'Ensino Fundamental I' ? (
                           <>
-                            <td className="border border-slate-900 p-2">{grade.notebookGrade !== undefined ? grade.notebookGrade.toFixed(2).replace('.', ',') : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.writtenActivity1 !== undefined ? grade.writtenActivity1.toFixed(2).replace('.', ',') : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.writtenActivity2 !== undefined ? grade.writtenActivity2.toFixed(2).replace('.', ',') : '-'}</td>
                             <td className="border border-slate-900 p-2">{grade.projectGrade !== undefined ? grade.projectGrade.toFixed(2).replace('.', ',') : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.oralActivityGrade !== undefined ? grade.oralActivityGrade.toFixed(2).replace('.', ',') : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.notebookGrade !== undefined ? grade.notebookGrade.toFixed(2).replace('.', ',') : '-'}</td>
                           </>
                         ) : (
                           <>
+                            <td className="border border-slate-900 p-2">{grade.writtenActivity1 !== undefined ? grade.writtenActivity1.toFixed(2).replace('.', ',') : '-'}</td>
+                            <td className="border border-slate-900 p-2">{grade.writtenActivity2 !== undefined ? grade.writtenActivity2.toFixed(2).replace('.', ',') : '-'}</td>
                             <td className="border border-slate-900 p-2">{grade.projectGrade !== undefined ? grade.projectGrade.toFixed(2).replace('.', ',') : '-'}</td>
                             <td className="border border-slate-900 p-2">{grade.oralActivityGrade !== undefined ? grade.oralActivityGrade.toFixed(2).replace('.', ',') : '-'}</td>
                             <td className="border border-slate-900 p-2">{grade.notebookGrade !== undefined ? grade.notebookGrade.toFixed(2).replace('.', ',') : '-'}</td>
