@@ -1580,6 +1580,18 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                                       max="10"
                                       step="0.1"
                                       className="w-full h-10 px-1 text-center text-xs outline-none focus:bg-emerald-50 disabled:bg-slate-50 disabled:text-slate-400"
+                                      value={grade.projectGrade || ''}
+                                      disabled={isTransferred}
+                                      onChange={e => updateGrade(student.id, 'projectGrade', e.target.value, subject.id)}
+                                    />
+                                  </td>
+                                  <td className="p-0 border border-slate-200">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max="10"
+                                      step="0.1"
+                                      className="w-full h-10 px-1 text-center text-xs outline-none focus:bg-emerald-50 disabled:bg-slate-50 disabled:text-slate-400"
                                       value={grade.oralActivityGrade || ''}
                                       disabled={isTransferred}
                                       onChange={e => updateGrade(student.id, 'oralActivityGrade', e.target.value, subject.id)}
@@ -2122,9 +2134,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                         <th className="border border-slate-900 p-2 w-16">CA</th>
                       </>
                     )}
-                    <th className="border border-slate-900 p-2 w-16">
-                      {selectedClass?.educationLevel === 'Ensino Fundamental I' ? 'TOTAL' : 'MB'}
-                    </th>
+                    <th className="border border-slate-900 p-2 w-16">MB</th>
                   </tr>
                 </thead>
                 <tbody>
