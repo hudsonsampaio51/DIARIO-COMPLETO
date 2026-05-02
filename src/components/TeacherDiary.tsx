@@ -970,7 +970,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
   })();
 
   return (
-    <div className="p-8 relative">
+    <div className="p-4 md:p-8 relative">
       {loadingData && (
         <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] z-50 flex items-center justify-center rounded-2xl">
           <div className="flex flex-col items-center gap-2">
@@ -985,7 +985,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            className="bg-white rounded-2xl p-4 md:p-8 max-w-md w-full shadow-2xl overflow-y-auto max-h-[90vh]"
           >
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-slate-900">Gerenciar Datas</h2>
@@ -1109,7 +1109,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         </div>
       )}
 
-      <header className="mb-8 bg-white p-8 rounded-2xl shadow-sm border border-slate-100 text-center relative overflow-hidden">
+      <header className="mb-4 md:mb-8 bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-slate-100 text-center relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-emerald-600"></div>
         <div className="flex justify-center mb-6">
           <img 
@@ -1120,16 +1120,16 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
           />
         </div>
         <div className="mb-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Governo do Estado de Rondônia</p>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Prefeitura Municipal de Ji-Paraná</p>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Secretaria Municipal de Educação</p>
+          <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-[0.2em] leading-relaxed">Governo do Estado de Rondônia</p>
+          <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-[0.2em] leading-relaxed">Prefeitura Municipal de Ji-Paraná</p>
+          <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-[0.2em] leading-relaxed">Secretaria Municipal de Educação</p>
         </div>
         
-        <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter mb-1">Diário Escolar</h1>
+        <h1 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tighter mb-1">Diário Escolar</h1>
         <p className="text-emerald-600 font-bold text-sm mb-6">ANO LETIVO {school?.schoolYear || '---'}</p>
 
         {selectedClass && (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-y-4 gap-x-8 text-left border-t border-slate-100 pt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-4 gap-x-4 lg:gap-x-8 text-left border-t border-slate-100 pt-6">
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase">Etapa</p>
               <p className="font-bold text-slate-700">{selectedClass.educationLevel ? selectedClass.educationLevel.toUpperCase() : 'ENSINO FUNDAMENTAL'}</p>
@@ -1156,12 +1156,12 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                 {currentTeacherName}
               </p>
             </div>
-            <div>
+            <div className="sm:col-span-2 lg:col-span-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase">Componente Curricular</p>
               <select 
                 value={selectedSubjectId}
                 onChange={e => setSelectedSubjectId(e.target.value)}
-                className="font-bold text-slate-700 bg-transparent border-none p-0 outline-none cursor-pointer hover:text-emerald-600 transition-colors"
+                className="font-bold text-slate-700 bg-transparent border-none p-0 outline-none cursor-pointer hover:text-emerald-600 transition-colors w-full appearance-none"
               >
                 {selectedClass?.educationLevel === 'Ensino Fundamental I' && mode !== 'grades' ? (
                   <option value="TODAS">TODAS</option>
@@ -1218,24 +1218,24 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         <div className="lg:col-span-3">
           {selectedClass ? (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <div className="flex gap-4 items-center">
-                  <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+              <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col xl:flex-row justify-between items-start xl:items-center bg-slate-50 gap-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center w-full xl:w-auto">
+                  <div className="flex flex-wrap sm:flex-nowrap gap-2 p-1 bg-slate-100 rounded-xl w-full sm:w-auto overflow-x-auto">
                     <button
                       onClick={() => setMode('attendance')}
-                      className={`px-4 py-2 rounded-lg font-semibold transition-all ${mode === 'attendance' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap flex-1 sm:flex-none ${mode === 'attendance' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       Frequência
                     </button>
                     <button
                       onClick={() => setMode('grades')}
-                      className={`px-4 py-2 rounded-lg font-semibold transition-all ${mode === 'grades' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap flex-1 sm:flex-none ${mode === 'grades' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       Notas
                     </button>
                     <button
                       onClick={() => setMode('occurrences')}
-                      className={`px-4 py-2 rounded-lg font-semibold transition-all ${mode === 'occurrences' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      className={`px-4 py-2 rounded-lg font-semibold transition-all whitespace-nowrap flex-1 sm:flex-none ${mode === 'occurrences' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       Ocorrências
                     </button>
@@ -1244,7 +1244,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                   {mode === 'grades' && selectedClass?.educationLevel === 'Ensino Fundamental I' && (
                     <button
                       onClick={initializeEF1Subjects}
-                      className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
+                      className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm w-full sm:w-auto justify-center"
                       title="Inicializar Disciplinas do Ensino Fundamental I"
                     >
                       <Plus size={16} />
@@ -1256,7 +1256,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                     <select 
                       value={period}
                       onChange={e => setPeriod(e.target.value)}
-                      className="px-4 py-2 rounded-xl border border-slate-200 outline-none text-sm font-bold text-slate-700 bg-white shadow-sm focus:ring-2 focus:ring-emerald-500"
+                      className="px-4 py-2 rounded-xl border border-slate-200 outline-none text-sm font-bold text-slate-700 bg-white shadow-sm focus:ring-2 focus:ring-emerald-500 w-full sm:w-auto"
                     >
                       <option>1º Bimestre</option>
                       <option>2º Bimestre</option>
@@ -1269,7 +1269,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                 {mode === 'grades' && (
                   <button
                     onClick={handlePrintGrades}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-sm"
+                    className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-colors flex items-center gap-2 shadow-sm w-full xl:w-auto justify-center whitespace-nowrap"
                   >
                     <Printer size={18} />
                     <span className="text-sm">Imprimir Ficha de Notas</span>
@@ -1277,13 +1277,13 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                 )}
                 
                 {mode === 'attendance' && (
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <Calendar size={18} className="text-slate-400" />
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full xl:w-auto">
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <Calendar size={18} className="text-slate-400 hidden sm:block" />
                         <select 
                           value={selectedSessionId}
                           onChange={e => setSelectedSessionId(e.target.value)}
-                          className="px-4 py-2 rounded-lg border border-slate-200 outline-none text-sm font-medium bg-white"
+                          className="px-4 py-2 rounded-lg border border-slate-200 outline-none text-sm font-medium bg-white flex-1 min-w-[200px]"
                         >
                           <option value="">Selecione a Aula...</option>
                           {sessions.filter(s => (s as any).period === period).map(s => (
@@ -1296,32 +1296,32 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                         </select>
                         <button 
                           onClick={() => setShowSessionManager(true)}
-                          className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
+                          className="p-2 text-slate-400 hover:text-emerald-600 transition-colors bg-white border border-slate-200 rounded-lg sm:border-none sm:bg-transparent"
                           title="Gerenciar Datas"
                         >
                           <Plus size={20} />
                         </button>
                       </div>
-                      <div className="flex items-center gap-2 border-l border-slate-200 pl-4">
+                      <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 sm:border-l border-slate-200 sm:pl-4 pt-4 sm:pt-0 border-t sm:border-t-0 mt-2 sm:mt-0 w-full sm:w-auto">
                         <select 
                           value={selectedReportMonth}
                           onChange={e => setSelectedReportMonth(parseInt(e.target.value))}
-                          className="px-3 py-2 rounded-lg border border-slate-200 outline-none text-sm font-medium bg-white"
+                          className="px-3 py-2 rounded-lg border border-slate-200 outline-none text-sm font-medium bg-white flex-1"
                         >
                           {['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].map((m, i) => (
                             <option key={i + 1} value={i + 1}>{m}</option>
                           ))}
                         </select>
-                        <div className="flex flex-col items-end">
+                        <div className="flex flex-col items-center xs:items-end w-full xs:w-auto mt-2 xs:mt-0">
                           <button
                             onClick={handlePrintMonthly}
-                            className="flex items-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors px-3 py-2 rounded-lg hover:bg-emerald-50"
+                            className="flex items-center justify-center gap-2 text-slate-500 hover:text-emerald-600 transition-colors px-3 py-2 rounded-lg hover:bg-emerald-50 border border-slate-200 xs:border-none w-full xs:w-auto bg-white xs:bg-transparent"
                           >
                             <Printer size={18} />
-                            <span className="text-sm font-medium">Gerar PDF Mensal</span>
+                            <span className="text-sm font-medium whitespace-nowrap">Gerar PDF Mensal</span>
                           </button>
                           {window.self !== window.top && (
-                            <span className="text-[10px] text-slate-400 italic">Dica: Abra em nova aba para imprimir</span>
+                            <span className="text-[10px] text-slate-400 italic mt-1 hidden sm:block">Dica: Abra em nova aba</span>
                           )}
                         </div>
                       </div>
@@ -1797,11 +1797,11 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             </div>
 
             {mode !== 'occurrences' && (
-                <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-4">
+                <div className="p-4 sm:p-6 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-4">
                   {mode === 'grades' && (
                     <button
                       onClick={handlePrintGrades}
-                      className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-6 py-3 rounded-xl font-bold transition-all shadow-sm"
+                      className="flex items-center justify-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 px-6 py-3 rounded-xl font-bold transition-all shadow-sm w-full sm:w-auto"
                     >
                       <Printer size={20} />
                       Imprimir Ficha de Notas
@@ -1809,7 +1809,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                   )}
                   <button
                     onClick={mode === 'attendance' ? handleSaveAttendance : handleSaveGrades}
-                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md"
+                    className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-md w-full sm:w-auto"
                   >
                     <Save size={20} />
                     Salvar {mode === 'attendance' ? 'Frequência' : 'Notas'}
