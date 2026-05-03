@@ -1866,50 +1866,53 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             <div className="page-break-after-always p-2">
             <div className="border-2 border-slate-900 p-1">
               <div className="border-b border-slate-900 pb-1 mb-1">
-                <div className="grid grid-cols-4 gap-2 text-[8px] font-bold">
-                  <div className="col-span-1">
+                <div className="flex justify-between items-start gap-4 text-[8px] font-bold w-full">
+                  <div className="flex-1 max-w-[60%]">
                     <div className="flex items-center gap-2 mb-1">
                       <img 
                         src={school?.logoUrl || 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Bras%C3%A3o_de_Ji-Paran%C3%A1.png/200px-Bras%C3%A3o_de_Ji-Paran%C3%A1.png'} 
                         alt={school?.name || 'Brasão'} 
-                        className="h-12 w-auto object-contain"
+                        className="h-12 w-auto object-contain flex-shrink-0"
                         referrerPolicy="no-referrer"
                       />
-                      <div>
-                        <p>{selectedClass?.educationLevel ? selectedClass.educationLevel.toUpperCase() : 'ENSINO FUNDAMENTAL'}</p>
-                        <p className="text-[10px] font-black">ESCOLA: {school?.name || '---'}</p>
-                        <div className="text-[7px] font-normal leading-tight">
-                          <p>{school?.address || ''}</p>
-                          {school?.creationDecree && <p>DECRETO: {school.creationDecree}</p>}
-                          {school?.authorization && <p>AUTORIZAÇÃO/PARECER: {school.authorization}</p>}
-                          {school?.resolution && <p>RESOLUÇÃO: {school.resolution}</p>}
+                      <div className="min-w-0">
+                        <p className="whitespace-nowrap">{selectedClass?.educationLevel ? selectedClass.educationLevel.toUpperCase() : 'ENSINO FUNDAMENTAL'}</p>
+                        <p className="text-[10px] font-black whitespace-nowrap">ESCOLA: {school?.name || '---'}</p>
+                        <div className="text-[7px] font-normal leading-tight flex flex-col">
+                          <p className="whitespace-nowrap">{school?.address || ''}</p>
+                          {school?.creationDecree && <p className="whitespace-nowrap">DECRETO: {school.creationDecree}</p>}
+                          {school?.authorization && <p className="whitespace-nowrap">AUTORIZAÇÃO/PARECER: {school.authorization}</p>}
+                          {school?.resolution && <p className="whitespace-nowrap">RESOLUÇÃO: {school.resolution}</p>}
                         </div>
                       </div>
                     </div>
-                    <p>PROFESSOR/A: {currentTeacherName}</p>
-                    <p>DISCIPLINA: {selectedSubjectId === 'TODAS' ? 'TODAS AS DISCIPLINAS' : (currentSubject?.name || '---')}</p>
+                    <p className="whitespace-nowrap">PROFESSOR/A: {currentTeacherName}</p>
+                    <p className="whitespace-nowrap">DISCIPLINA: {selectedSubjectId === 'TODAS' ? 'TODAS AS DISCIPLINAS' : (currentSubject?.name || '---')}</p>
                   </div>
-                  {selectedClass?.educationLevel === 'Ensino Fundamental II' ? (
-                    <>
-                      <div className="col-span-1">
-                        <p>AULAS NORMAIS: {filteredSessions.filter(s => !s.specialType).length}</p>
-                        <p>ESTADIA LETIVA: {filteredSessions.filter(s => s.specialType === 'E').length}</p>
-                      </div>
-                      <div className="col-span-1">
-                        <p>CONTRATURNO: {filteredSessions.filter(s => s.specialType === 'C').length}</p>
+                  
+                  <div className="flex gap-4 sm:gap-8 flex-shrink-0">
+                    {selectedClass?.educationLevel === 'Ensino Fundamental II' ? (
+                      <>
+                        <div className="whitespace-nowrap">
+                          <p>AULAS NORMAIS: {filteredSessions.filter(s => !s.specialType).length}</p>
+                          <p>ESTADIA LETIVA: {filteredSessions.filter(s => s.specialType === 'E').length}</p>
+                        </div>
+                        <div className="whitespace-nowrap">
+                          <p>CONTRATURNO: {filteredSessions.filter(s => s.specialType === 'C').length}</p>
+                          <p>DIAS LETIVOS: {filteredSessions.length}</p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="whitespace-nowrap">
                         <p>DIAS LETIVOS: {filteredSessions.length}</p>
                       </div>
-                    </>
-                  ) : (
-                    <div className="col-span-2">
-                      <p>DIAS LETIVOS: {filteredSessions.length}</p>
+                    )}
+                    <div className="whitespace-nowrap">
+                      <p>ETAPA: {selectedClass?.educationLevel ? selectedClass.educationLevel.toUpperCase() : '---'}</p>
+                      <p>TURMA: {selectedClass?.name || '---'}</p>
+                      <p>TURNO: {selectedClass?.shift || '---'}</p>
+                      <p>FREQUÊNCIA DE: {monthName} {new Date().getFullYear()}</p>
                     </div>
-                  )}
-                  <div className="col-span-1">
-                    <p>ETAPA: {selectedClass?.educationLevel ? selectedClass.educationLevel.toUpperCase() : '---'}</p>
-                    <p>TURMA: {selectedClass?.name || '---'}</p>
-                    <p>TURNO: {selectedClass?.shift || '---'}</p>
-                    <p>FREQUÊNCIA DE: {monthName} {new Date().getFullYear()}</p>
                   </div>
                 </div>
                 <div className="text-center text-[10px] font-bold uppercase mt-2">
@@ -2114,21 +2117,21 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             {(selectedClass?.educationLevel === 'Ensino Fundamental I' ? subjects : [subjects.find(s => s.id === selectedSubjectId)].filter(Boolean)).map((printSubject: any, subjectIndex: number, array: any[]) => (
               <div key={printSubject.id || 'single'} style={subjectIndex < array.length - 1 ? { pageBreakAfter: 'always' } : {}}>
                 <div className="p-4">
-                  <div className="flex items-center gap-4 mb-6 border-b-2 border-slate-900 pb-4">
+                  <div className="flex items-center gap-4 mb-6 border-b-2 border-slate-900 pb-4 w-full">
                     <img 
                       src={school?.logoUrl || 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Bras%C3%A3o_de_Ji-Paran%C3%A1.png/200px-Bras%C3%A3o_de_Ji-Paran%C3%A1.png'} 
                       alt={school?.name || 'Brasão'} 
-                      className="h-16 w-auto object-contain"
+                      className="h-16 w-auto object-contain flex-shrink-0"
                       referrerPolicy="no-referrer"
                     />
-                    <div className="header-info">
-                      <h1 className="text-xl font-black uppercase">{school?.name || '---'}</h1>
-                      <p className="text-sm font-bold uppercase">{selectedClass?.educationLevel || 'ENSINO FUNDAMENTAL'}</p>
-                      <div className="text-[10px] mt-1">
-                        <p>TURMA: {selectedClass?.name} ({selectedClass?.grade}) - TURNO: {selectedClass?.shift}</p>
-                        <p>DISCIPLINA: {printSubject.name}</p>
-                        <p>PROFESSOR(A): {printSubject.teacherId ? (allStaff.find((st: any) => st.id === printSubject.teacherId)?.firstName + ' ' + (allStaff.find((st: any) => st.id === printSubject.teacherId)?.lastName || '')) : currentTeacherName}</p>
-                        <p className="font-bold mt-1">{period.toUpperCase()}</p>
+                    <div className="header-info flex-1 min-w-0">
+                      <h1 className="text-xl font-black uppercase whitespace-nowrap truncate">{school?.name || '---'}</h1>
+                      <p className="text-sm font-bold uppercase whitespace-nowrap">{selectedClass?.educationLevel || 'ENSINO FUNDAMENTAL'}</p>
+                      <div className="text-[10px] mt-1 flex flex-col">
+                        <p className="whitespace-nowrap">TURMA: {selectedClass?.name} ({selectedClass?.grade}) - TURNO: {selectedClass?.shift}</p>
+                        <p className="whitespace-nowrap">DISCIPLINA: {printSubject.name}</p>
+                        <p className="whitespace-nowrap truncate">PROFESSOR(A): {printSubject.teacherId ? (allStaff.find((st: any) => st.id === printSubject.teacherId)?.firstName + ' ' + (allStaff.find((st: any) => st.id === printSubject.teacherId)?.lastName || '')) : currentTeacherName}</p>
+                        <p className="font-bold mt-1 whitespace-nowrap">{period.toUpperCase()}</p>
                       </div>
                     </div>
                   </div>
