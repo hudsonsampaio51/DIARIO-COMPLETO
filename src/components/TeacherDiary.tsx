@@ -947,12 +947,33 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
     }
   };
 
-  const getPeriodText = () => {
-    const periods = Array.from(new Set(sessions.map(s => (s as any).period).filter(Boolean)));
+  const getPeriodText = (providedSessions: ClassSession[] = sessions) => {
+    let periods: string[] = [];
+    
+    if (school?.academicPeriods && school.academicPeriods.length > 0) {
+      if (providedSessions.length > 0) {
+        const foundPeriods = new Set<string>();
+        providedSessions.forEach(session => {
+          const sessionDate = session.date;
+          const matchingPeriod = school.academicPeriods!.find(p => p.startDate && p.endDate && sessionDate >= p.startDate && sessionDate <= p.endDate);
+          if (matchingPeriod) foundPeriods.add(matchingPeriod.name);
+        });
+        periods = Array.from(foundPeriods);
+      }
+    } else {
+      periods = Array.from(new Set(providedSessions.map(s => (s as any).period).filter(Boolean)));
+    }
+
     if (periods.length === 0) return period.toUpperCase();
     if (periods.length === 1) return String(periods[0]).toUpperCase();
     
-    const numbers = periods.sort().map(p => String(p).split(' ')[0]);
+    const sorted = periods.sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.replace(/\D/g, '')) || 0;
+      return numA - numB;
+    });
+    
+    const numbers = sorted.map(p => String(p).split(' ')[0]);
     return `${numbers.join('/')} BIMESTRE`.toUpperCase();
   };
 
@@ -1892,7 +1913,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                   </div>
                 </div>
                 <div className="text-center text-[10px] font-bold uppercase mt-2">
-                  {getPeriodText()}
+                  {getPeriodText(filteredSessions)}
                 </div>
               </div>
 
@@ -2019,7 +2040,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
               <div className="text-center mb-4 border-b border-slate-900 pb-2">
                 <h2 className="text-sm font-black uppercase">Registro de Conteúdos Ministrados</h2>
                 <p className="text-[10px] uppercase">Ano Letivo {school?.schoolYear || '---'} - {selectedClass?.name} - {selectedSubjectId === 'TODAS' ? 'TODAS AS DISCIPLINAS' : subjects.find(s => s.id === selectedSubjectId)?.name}</p>
-                <p className="text-[10px] font-bold uppercase mt-1">{getPeriodText()}</p>
+                <p className="text-[10px] font-bold uppercase mt-1">{getPeriodText(filteredSessions)}</p>
               </div>
 
               <table className="w-full border-collapse border border-slate-900 text-[10px]">
