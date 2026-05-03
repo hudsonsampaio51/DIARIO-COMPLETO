@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
-import { collection, addDoc, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
-import { Class, Subject, ClassSchedule, ClassSession } from '../types';
-import { Calendar, Clock, BookOpen, Plus, Trash2, ChevronRight, ShieldCheck, AlertCircle, X } from 'lucide-react';
+import { collection, addDoc, getDocs, query, where, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { Class, Subject, ClassSchedule, ClassSession, School, AcademicPeriod } from '../types';
+import { Calendar, Clock, BookOpen, Plus, Trash2, ChevronRight, ShieldCheck, AlertCircle, X, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError } from '../utils/errorHandling';
 
@@ -36,6 +36,15 @@ export const SupervisorPanel: React.FC<SupervisorPanelProps> = ({ schoolId }) =>
     subjectId: ''
   });
 
+  const [school, setSchool] = useState<School | null>(null);
+  const [showPeriodConfig, setShowPeriodConfig] = useState(false);
+  const [academicPeriods, setAcademicPeriods] = useState<AcademicPeriod[]>([
+    { name: '1º Bimestre', startDate: '', endDate: '' },
+    { name: '2º Bimestre', startDate: '', endDate: '' },
+    { name: '3º Bimestre', startDate: '', endDate: '' },
+    { name: '4º Bimestre', startDate: '', endDate: '' },
+  ]);
+
   useEffect(() => {
     if (feedback) {
       const timer = setTimeout(() => setFeedback(null), 3000);
@@ -55,13 +64,27 @@ export const SupervisorPanel: React.FC<SupervisorPanelProps> = ({ schoolId }) =>
   ];
 
   useEffect(() => {
-    const fetchClasses = async () => {
+    const fetchClassesAndSchool = async () => {
       if (!schoolId) return;
-      const q = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
-      const snap = await getDocs(q);
-      setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() as any } as Class)));
+
+      try {
+        const schoolDoc = await getDoc(doc(db, 'schools', schoolId));
+        if (schoolDoc.exists()) {
+          const schoolData = { id: schoolDoc.id, ...schoolDoc.data() } as School;
+          setSchool(schoolData);
+          if (schoolData.academicPeriods && schoolData.academicPeriods.length > 0) {
+            setAcademicPeriods(schoolData.academicPeriods);
+          }
+        }
+
+        const q = query(collection(db, 'classes'), where('schoolId', '==', schoolId));
+        const snap = await getDocs(q);
+        setClasses(snap.docs.map(d => ({ id: d.id, ...d.data() as any } as Class)));
+      } catch (error) {
+        console.error("Error fetching initial data", error);
+      }
     };
-    fetchClasses();
+    fetchClassesAndSchool();
   }, [schoolId]);
 
   useEffect(() => {
@@ -198,10 +221,103 @@ export const SupervisorPanel: React.FC<SupervisorPanelProps> = ({ schoolId }) =>
     }
   };
 
+  const handleSavePeriods = async () => {
+    try {
+      await updateDoc(doc(db, 'schools', schoolId), {
+        academicPeriods
+      });
+      setSchool(prev => prev ? { ...prev, academicPeriods } : null);
+      setShowPeriodConfig(false);
+      showFeedback('Períodos letivos atualizados com sucesso');
+    } catch (error) {
+      console.error("Error updating periods", error);
+      showFeedback('Erro ao atualizar períodos letivos', 'error');
+    }
+  };
+
   return (
     <div className="p-8">
+      {/* Configure Periods Modal */}
+      {showPeriodConfig && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative max-h-[90vh] overflow-y-auto"
+          >
+            <button onClick={() => setShowPeriodConfig(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+              <X size={24} />
+            </button>
+            <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <Settings className="text-indigo-600" />
+              Configurar Períodos Letivos (Bimestres)
+            </h2>
+            <div className="space-y-6 mb-8">
+              {academicPeriods.map((period, idx) => (
+                <div key={idx} className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col md:flex-row items-center gap-4">
+                  <div className="flex-1 w-full">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Nome</label>
+                    <input
+                      type="text"
+                      value={period.name}
+                      onChange={(e) => {
+                        const newPeriods = [...academicPeriods];
+                        newPeriods[idx].name = e.target.value;
+                        setAcademicPeriods(newPeriods);
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-200 mt-1"
+                    />
+                  </div>
+                  <div className="flex-1 w-full">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Início</label>
+                    <input
+                      type="date"
+                      value={period.startDate}
+                      onChange={(e) => {
+                        const newPeriods = [...academicPeriods];
+                        newPeriods[idx].startDate = e.target.value;
+                        setAcademicPeriods(newPeriods);
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-200 mt-1"
+                    />
+                  </div>
+                  <div className="flex-1 w-full">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Fim</label>
+                    <input
+                      type="date"
+                      value={period.endDate}
+                      onChange={(e) => {
+                        const newPeriods = [...academicPeriods];
+                        newPeriods[idx].endDate = e.target.value;
+                        setAcademicPeriods(newPeriods);
+                      }}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-200 mt-1"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowPeriodConfig(false)}
+                className="px-6 py-3 rounded-xl border border-slate-200 font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSavePeriods}
+                className="px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 shadow-md"
+              >
+                Salvar Alterações
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Feedback Message */}
       <AnimatePresence>
+
         {feedback && (
           <motion.div
             initial={{ opacity: 0, y: 50 }}
@@ -250,9 +366,18 @@ export const SupervisorPanel: React.FC<SupervisorPanelProps> = ({ schoolId }) =>
         </div>
       )}
 
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Painel do Supervisor</h1>
-        <p className="text-slate-500">Gestão de disciplinas, horários e calendário letivo</p>
+      <header className="mb-8 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">Painel do Supervisor</h1>
+          <p className="text-slate-500">Gestão de disciplinas, horários e calendário letivo</p>
+        </div>
+        <button
+          onClick={() => setShowPeriodConfig(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
+        >
+          <Settings size={20} className="text-indigo-600" />
+          Configurar Períodos Letivos
+        </button>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
