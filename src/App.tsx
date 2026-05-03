@@ -8,6 +8,7 @@ import { TeacherDiary } from './components/TeacherDiary';
 import { ReportCard } from './components/ReportCard';
 import { OfficialDocuments } from './components/OfficialDocuments';
 import { SuperAdminPanel } from './components/SuperAdminPanel';
+import LandingPage from './components/LandingPage';
 import { UserProfile } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -42,7 +43,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       <Auth onUserChange={setUser} />
       
-      {user && (
+      {user ? (
         <div className="flex flex-1 overflow-hidden">
           <Sidebar 
             activeTab={activeTab} 
@@ -65,6 +66,8 @@ export default function App() {
             </AnimatePresence>
           </main>
         </div>
+      ) : (
+        <LandingPage />
       )}
     </div>
   );

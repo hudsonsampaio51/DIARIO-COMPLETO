@@ -117,7 +117,7 @@ export const Auth: React.FC<{ onUserChange: (user: UserProfile | null) => void }
     handleLogin();
   };
 
-  if (loading) return <div className="flex items-center justify-center h-screen">Carregando...</div>;
+  if (loading) return null;
 
   if (showRoleSelection) {
     return (
@@ -157,24 +157,7 @@ export const Auth: React.FC<{ onUserChange: (user: UserProfile | null) => void }
   }
 
   if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center h-screen bg-slate-50">
-        <div className="p-10 bg-white rounded-3xl shadow-2xl max-w-md w-full text-center border border-slate-100">
-          <div className="w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3">
-            <BookOpen className="text-emerald-600 w-10 h-10 -rotate-3" />
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2 tracking-tight">SISGES SAMPAIO</h1>
-          <p className="text-slate-500 mb-10">Sistema Integrado de Gestão Escolar</p>
-          <button
-            onClick={handleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-slate-900 text-white py-4 px-6 rounded-2xl hover:bg-slate-800 transition-all font-semibold shadow-xl shadow-slate-200"
-          >
-            <LogIn size={20} />
-            Entrar com Google
-          </button>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
