@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { LogIn, CheckCircle, Zap, Shield, BarChart3 } from 'lucide-react';
+import { LogIn, CheckCircle, Zap, Shield, BarChart3, Mail, MessageCircle } from 'lucide-react';
 import LoginModal from './LoginModal';
 
 const LandingPage: React.FC = () => {
@@ -98,7 +98,7 @@ const LandingPage: React.FC = () => {
                   </div>
 
                   {/* Título do card */}
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2 mt-4">
+                  <h2 className="text-2xl font-bold text-green-600 mb-2 mt-4 text-center">
                     Adquira seu sistema de gestão escolar
                   </h2>
                   <p className="text-gray-600 mb-6">
@@ -166,12 +166,84 @@ const LandingPage: React.FC = () => {
           </div>
         </main>
 
+        {/* Seção com Imagem de Profissionais */}
+        <section className="max-w-7xl mx-auto px-6 py-16">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.4 }}
+            className="relative rounded-2xl overflow-hidden shadow-2xl"
+          >
+            {/* Background Image */}
+            <img
+              src="https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&h=500&fit=crop"
+              alt="Profissionais da educação usando tecnologia"
+              className="w-full h-80 object-cover"
+            />
+            
+            {/* Overlay escuro */}
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-900/60 to-purple-900/60"></div>
+
+            {/* Texto sobre a imagem */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center text-white px-6">
+                <h3 className="text-4xl font-bold mb-4">
+                  Transformando a Educação com Tecnologia
+                </h3>
+                <p className="text-lg max-w-2xl mx-auto">
+                  Professores e profissionais da educação usando nossas ferramentas para criar um melhor futuro nos ambientes escolares
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </section>
+
         {/* Footer */}
-        <footer className="max-w-7xl mx-auto px-6 py-8 text-center text-gray-600 border-t border-gray-200/50">
-          <p>
-            © {new Date().getFullYear()} SISGES SAMPAIO - Sistema de Gestão Escolar. Todos os direitos
-            reservados.
-          </p>
+        <footer className="w-full bg-gradient-to-r from-blue-900 to-purple-900 text-white">
+          <div className="max-w-7xl mx-auto px-6 py-12">
+            {/* Contatos */}
+            <div className="grid md:grid-cols-2 gap-8 mb-8 pb-8 border-b border-white/20">
+              {/* Email */}
+              <motion.a
+                href="mailto:sisgessampaio@eadmatosinho.com"
+                whileHover={{ scale: 1.05 }}
+                className="flex items-center gap-4 p-4 bg-white/10 rounded-xl hover:bg-white/20 transition-all duration-300"
+              >
+                <div className="w-12 h-12 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm text-white/70">Email</p>
+                  <p className="font-semibold">sisgessampaio@eadmatosinho.com</p>
+                </div>
+              </motion.a>
+
+              {/* WhatsApp */}
+              <motion.a
+                href="https://wa.me/5569992004883"
+                target="_blank"
+                rel="noopener noreferrer"
+                whileHover={{ scale: 1.05 }}
+                className="flex items-center gap-4 p-4 bg-white/10 rounded-xl hover:bg-white/20 transition-all duration-300"
+              >
+                <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <MessageCircle className="w-6 h-6 text-white" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm text-white/70">WhatsApp</p>
+                  <p className="font-semibold">(69) 99200-4883</p>
+                </div>
+              </motion.a>
+            </div>
+
+            {/* Copyright */}
+            <div className="text-center text-white/70">
+              <p>
+                © {new Date().getFullYear()} SISGES SAMPAIO - Sistema de Gestão Escolar. Todos os direitos
+                reservados.
+              </p>
+            </div>
+          </div>
         </footer>
       </div>
 
