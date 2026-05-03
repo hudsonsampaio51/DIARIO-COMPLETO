@@ -322,7 +322,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
     if (selectedClass && selectedSubjectId) {
       const fetchSessions = async () => {
         const sorted = await fetchSessionsData(selectedClass.id, selectedSubjectId);
-        const filtered = sorted.filter(s => (s as any).period === period);
+        const filtered = sorted.filter(s => (s as any).period === period && (new Date(s.date + 'T12:00:00').getMonth() + 1 === selectedReportMonth));
         if (filtered.length > 0) {
           setSelectedSessionId(filtered[0].id);
         } else {
@@ -354,7 +354,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       fetchMonthlyAttendance();
       fetchOccurrences(selectedClass.id);
     }
-  }, [selectedClass, selectedSubjectId, period]);
+  }, [selectedClass, selectedSubjectId, period, selectedReportMonth]);
 
   useEffect(() => {
     if (selectedSessionId && monthlyAttendance.length > 0) {
@@ -1307,7 +1307,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                           className="px-4 py-2 rounded-lg border border-slate-200 outline-none text-sm font-medium bg-white flex-1 min-w-[200px]"
                         >
                           <option value="">Selecione a Aula...</option>
-                          {sessions.filter(s => (s as any).period === period).map(s => (
+                          {sessions.filter(s => (s as any).period === period && (new Date(s.date + 'T12:00:00').getMonth() + 1 === selectedReportMonth)).map(s => (
                             <option key={s.id} value={s.id}>
                               {new Date(s.date + 'T12:00:00').toLocaleDateString('pt-BR')} 
                               {selectedClass?.educationLevel !== 'Ensino Fundamental I' && ` - ${s.lessonNumber}`}
