@@ -32,7 +32,16 @@ export interface UserProfile {
   name: string;
   email: string;
   role: UserRole;
-  schoolId?: string;
+  schoolId?: string; // Escola ativa atual (compatibilidade)
+  schoolIds?: string[]; // Array de todas as escolas do usuário
+  activeSchoolId?: string; // ID da escola selecionada agora
+  createdAt: string;
+}
+
+export interface SchoolAccess {
+  email: string;
+  schoolId: string;
+  role: UserRole;
   createdAt: string;
 }
 
