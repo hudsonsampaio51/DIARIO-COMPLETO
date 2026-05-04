@@ -8,8 +8,7 @@ import {
   Settings,
   School,
   FileText,
-  ShieldCheck,
-  Eye
+  ShieldCheck
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -23,9 +22,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, role 
   const menuItems = [
     { id: 'dashboard', label: 'Painel', icon: LayoutDashboard, roles: ['admin', 'secretary', 'teacher', 'superadmin'] },
     { id: 'superadmin', label: 'Super Admin', icon: ShieldCheck, roles: ['superadmin'] },
-    { id: 'users', label: 'Gerenciar Usuários', icon: Users, roles: ['superadmin', 'admin'] },
     { id: 'secretary', label: 'Secretaria', icon: School, roles: ['admin', 'secretary'] },
-    { id: 'supervisor', label: 'Supervisor', icon: Eye, roles: ['admin', 'supervisor'] },
+    { id: 'supervisor', label: 'Supervisor', icon: Users, roles: ['admin', 'supervisor'] },
     { id: 'diary', label: 'Diário de Classe', icon: ClipboardCheck, roles: ['admin', 'teacher'] },
     { id: 'report', label: 'Boletins', icon: GraduationCap, roles: ['admin', 'secretary', 'teacher'] },
     { id: 'documents', label: 'Documentos', icon: FileText, roles: ['admin', 'secretary'] },
