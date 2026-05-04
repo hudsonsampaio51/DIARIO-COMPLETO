@@ -62,7 +62,7 @@ service cloud.firestore {
     // Usuários - Apenas pode ler/escrever seu próprio documento
     match /users/{userId} {
       allow read: if request.auth.uid == userId;
-      allow write: if request.auth.uid == userId || request.auth.uid is null;
+      allow write: if request.auth.uid == userId || request.auth == null;
     }
     
     // schoolAccess - Ler: qualquer autenticado. Escrever: Admin/SuperAdmin
@@ -103,32 +103,30 @@ service cloud.firestore {
 
     // Helper Functions
     function isSuperAdmin() {
-      return getUserRole() == 'superadmin';
+      return request.auth != null && getUserRole() == 'superadmin';
     }
 
     function isAdmin() {
-      return getUserRole() == 'admin';
+      return request.auth != null && getUserRole() == 'admin';
     }
 
     function isAdminOfSchool(schoolId) {
       let userSchool = getUserSchoolId();
-      return (getUserRole() == 'admin' || getUserRole() == 'superadmin') 
+      return request.auth != null && 
+        (getUserRole() == 'admin' || getUserRole() == 'superadmin') 
         && userSchool == schoolId;
     }
 
     function getUserRole() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc.data.role;
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function getUserSchoolId() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc.data.activeSchoolId;
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeSchoolId;
     }
 
     function userSchoolId() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc.data.activeSchoolId;
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeSchoolId;
     }
   }
 }
