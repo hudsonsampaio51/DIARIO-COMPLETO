@@ -8,6 +8,7 @@ import { TeacherDiary } from './components/TeacherDiary';
 import { ReportCard } from './components/ReportCard';
 import { OfficialDocuments } from './components/OfficialDocuments';
 import { SuperAdminPanel } from './components/SuperAdminPanel';
+import UserManagement from './components/UserManagement';
 import LandingPage from './components/LandingPage';
 import { UserProfile } from './types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -22,6 +23,8 @@ export default function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard schoolId={user.schoolId} />;
+      case 'users':
+        return <UserManagement currentUser={user} />;
       case 'secretary':
         return <Secretary schoolId={user.schoolId || ''} />;
       case 'supervisor':
