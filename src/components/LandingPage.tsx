@@ -119,7 +119,7 @@ const LandingPage: React.FC = () => {
 
                   {/* Feature list */}
                   <ul className="space-y-3 mb-6">
-                    {['Adaptado incluse para Projeto Educampo','Gestão de alunos', 'Controle de notas', 'Agendamentos', 'Relatórios'].map(
+                    {['Adaptado inclusive para Projeto Educampo','Gestão de alunos', 'Controle de notas', 'Agendamentos', 'Relatórios'].map(
                       (feature) => (
                         <li key={feature} className="flex items-center gap-3 text-gray-700">
                           <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
