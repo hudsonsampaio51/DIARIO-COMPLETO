@@ -214,7 +214,7 @@ const LandingPage: React.FC = () => {
                 </div>
                 <div className="text-left">
                   <p className="text-sm text-white/70">Email</p>
-                  <p className="font-semibold">sisgessampaio@eadmatosinho.com</p>
+                  <p className="font-semibold">sisgessampaio@gerenciadorescolar.com</p>
                 </div>
               </motion.a>
 
