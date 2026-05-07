@@ -313,15 +313,15 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                   }, {} as Record<string, boolean>)), ...Object.keys(studentAbsences)]));
 
                   const sortedSubjectIds = allSubjectIds.sort((a, b) => {
-                    const nameA = a === 'default' ? 'FALTAS' : (subjects[a]?.name || 'Disciplina');
-                    const nameB = b === 'default' ? 'FALTAS' : (subjects[b]?.name || 'Disciplina');
+                    const nameA = a === 'default' ? 'FALTAS' : (subjects[a]?.name || 'FALTAS');
+                    const nameB = b === 'default' ? 'FALTAS' : (subjects[b]?.name || 'FALTAS');
                     if (nameA === 'FALTAS') return 1;
                     if (nameB === 'FALTAS') return -1;
                     return nameA.localeCompare(nameB);
                   });
 
                   return sortedSubjectIds.map((subjectId) => {
-                    const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'Disciplina');
+                    const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'FALTAS');
                     const subjectGradesList = studentGrades.filter(g => (g.subjectId || 'default') === subjectId);
                   const rawMedia = subjectGradesList.length > 0 ? subjectGradesList.reduce((acc, g) => acc + g.value, 0) / subjectGradesList.length : 0;
                   const media = rawMedia > 0 ? roundAverage(rawMedia) : 0;
@@ -411,7 +411,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                   // Process grades
                   studentGrades.forEach(grade => {
                     const subjectId = grade.subjectId || 'default';
-                    const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'Disciplina');
+                    const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'FALTAS');
                     const workload = subjects[subjectId]?.workload;
                     
                     if (!groupedData[subjectName]) {
@@ -426,7 +426,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
 
                   // Process absences
                   Object.entries(studentAbsences).forEach(([subjectId, abs]) => {
-                    const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'Disciplina');
+                    const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'FALTAS');
                     if (!groupedData[subjectName]) {
                       groupedData[subjectName] = { grades: {}, absences: {} };
                     }
