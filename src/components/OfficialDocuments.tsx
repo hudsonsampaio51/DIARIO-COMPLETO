@@ -305,12 +305,24 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                 </tr>
               </thead>
               <tbody>
-                {Array.from(new Set([...Object.keys(studentGrades.reduce((acc, grade) => {
+                {(() => {
+                  const allSubjectIds = Array.from(new Set([...Object.keys(studentGrades.reduce((acc, grade) => {
                     const subjectId = grade.subjectId || 'default';
                     acc[subjectId] = true;
                     return acc;
-                  }, {} as Record<string, boolean>)), ...Object.keys(studentAbsences)])).map((subjectId) => {
-                  const subjectGradesList = studentGrades.filter(g => (g.subjectId || 'default') === subjectId);
+                  }, {} as Record<string, boolean>)), ...Object.keys(studentAbsences)]));
+
+                  const sortedSubjectIds = allSubjectIds.sort((a, b) => {
+                    const nameA = subjects[a]?.name || 'FALTAS';
+                    const nameB = subjects[b]?.name || 'FALTAS';
+                    if (nameA === 'FALTAS') return 1;
+                    if (nameB === 'FALTAS') return -1;
+                    return 0;
+                  });
+
+                  return sortedSubjectIds.map((subjectId) => {
+                    const subjectName = subjects[subjectId]?.name || 'FALTAS';
+                    const subjectGradesList = studentGrades.filter(g => (g.subjectId || 'default') === subjectId);
                   const rawMedia = subjectGradesList.length > 0 ? subjectGradesList.reduce((acc, g) => acc + g.value, 0) / subjectGradesList.length : 0;
                   const media = rawMedia > 0 ? roundAverage(rawMedia) : 0;
                   
@@ -319,17 +331,17 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
 
                   return (
                     <tr key={subjectId}>
-                      <td className="border border-slate-900 p-2">{subjects[subjectId]?.name || 'FALTAS'}</td>
+                      <td className="border border-slate-900 p-2">{subjectName}</td>
                       <td className="border border-slate-900 p-2 text-center">{subjects[subjectId]?.workload ? `${subjects[subjectId].workload}h` : '-'}</td>
                       <td className="border border-slate-900 p-2 text-center">Ano Letivo</td>
-                      <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(2).replace('.', ',') : '-'}</td>
+                      <td className="border border-slate-900 p-2 text-center font-bold">{subjectName === 'FALTAS' ? '-' : (media > 0 ? media.toFixed(2).replace('.', ',') : '-')}</td>
                       <td className="border border-slate-900 p-2 text-center font-bold">{fTotal}</td>
                       <td className="border border-slate-900 p-2 text-center font-bold">
-                        {media >= 6 ? 'APROVADO' : media > 0 ? 'RECUPERAÇÃO' : '-'}
+                        {subjectName === 'FALTAS' ? '-' : (media >= 6 ? 'APROVADO' : media > 0 ? 'RECUPERAÇÃO' : '-')}
                       </td>
                     </tr>
                   );
-                })}
+                })})()}
                 {studentGrades.length === 0 && Object.keys(studentAbsences).length === 0 && (
                   <tr>
                     <td colSpan={6} className="border border-slate-900 p-8 text-center italic text-slate-400">
@@ -398,7 +410,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
 
                   // Process grades
                   studentGrades.forEach(grade => {
-                    const subjectName = subjects[grade.subjectId || '']?.name || 'FALTAS';
+                    const subjectName = subjects[grade.subjectId || '']?.name || 'Disciplina';
                     const workload = subjects[grade.subjectId || '']?.workload;
                     
                     if (!groupedData[subjectName]) {
@@ -413,7 +425,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
 
                   // Process absences
                   Object.entries(studentAbsences).forEach(([subjectId, abs]) => {
-                    const subjectName = subjects[subjectId]?.name || 'FALTAS';
+                    const subjectName = subjects[subjectId]?.name || 'Disciplina';
                     if (!groupedData[subjectName]) {
                       groupedData[subjectName] = { grades: {}, absences: {} };
                     }
@@ -423,7 +435,13 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                     });
                   });
 
-                  return Object.entries(groupedData).map(([subjectName, data]) => {
+                  const entries = Object.entries(groupedData).sort((a, b) => {
+                    if (a[0] === 'FALTAS') return 1;
+                    if (b[0] === 'FALTAS') return -1;
+                    return 0;
+                  });
+
+                  return entries.map(([subjectName, data]) => {
                     const b1 = data.grades['1º Bimestre'] || 0;
                     const b2 = data.grades['2º Bimestre'] || 0;
                     const b3 = data.grades['3º Bimestre'] || 0;
@@ -444,18 +462,18 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                         <td className="border border-slate-900 p-2 font-bold">{subjectName}</td>
                         <td className="border border-slate-900 p-2 text-center">{data.workload ? `${data.workload}h` : '-'}</td>
                         <td className="border border-slate-900 p-2 text-center">
-                          {b1 > 0 ? b1.toFixed(2).replace('.', ',') : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f1 > 0 ? f1 : '-'}</span>
+                          {subjectName === 'FALTAS' ? '-' : (b1 > 0 ? b1.toFixed(2).replace('.', ',') : '-')} <span className="text-slate-400">|</span> <span className="text-red-600">{f1 > 0 ? f1 : '-'}</span>
                         </td>
                         <td className="border border-slate-900 p-2 text-center">
-                          {b2 > 0 ? b2.toFixed(2).replace('.', ',') : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f2 > 0 ? f2 : '-'}</span>
+                          {subjectName === 'FALTAS' ? '-' : (b2 > 0 ? b2.toFixed(2).replace('.', ',') : '-')} <span className="text-slate-400">|</span> <span className="text-red-600">{f2 > 0 ? f2 : '-'}</span>
                         </td>
                         <td className="border border-slate-900 p-2 text-center">
-                          {b3 > 0 ? b3.toFixed(2).replace('.', ',') : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f3 > 0 ? f3 : '-'}</span>
+                          {subjectName === 'FALTAS' ? '-' : (b3 > 0 ? b3.toFixed(2).replace('.', ',') : '-')} <span className="text-slate-400">|</span> <span className="text-red-600">{f3 > 0 ? f3 : '-'}</span>
                         </td>
                         <td className="border border-slate-900 p-2 text-center">
-                          {b4 > 0 ? b4.toFixed(2).replace('.', ',') : '-'} <span className="text-slate-400">|</span> <span className="text-red-600">{f4 > 0 ? f4 : '-'}</span>
+                          {subjectName === 'FALTAS' ? '-' : (b4 > 0 ? b4.toFixed(2).replace('.', ',') : '-')} <span className="text-slate-400">|</span> <span className="text-red-600">{f4 > 0 ? f4 : '-'}</span>
                         </td>
-                        <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(2).replace('.', ',') : '-'}</td>
+                        <td className="border border-slate-900 p-2 text-center font-bold">{subjectName === 'FALTAS' ? '-' : (media > 0 ? media.toFixed(2).replace('.', ',') : '-')}</td>
                         <td className="border border-slate-900 p-2 text-center font-bold">{fTotal}</td>
                       </tr>
                     );
