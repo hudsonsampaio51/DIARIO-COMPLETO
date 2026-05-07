@@ -253,7 +253,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
 
                 // Process grades
                 studentGrades.forEach(grade => {
-                  const subjectName = subjects[grade.subjectId || '']?.name || 'FALTAS';
+                  const subjectName = subjects[grade.subjectId || '']?.name || 'Disciplina';
                   const workload = subjects[grade.subjectId || '']?.workload;
                   
                   if (!groupedData[subjectName]) {
@@ -265,7 +265,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
 
                 // Process absences
                 Object.entries(studentAbsences).forEach(([subjectId, abs]) => {
-                  const subjectName = subjects[subjectId]?.name || 'FALTAS';
+                  const subjectName = subjects[subjectId]?.name || 'Disciplina';
                   if (!groupedData[subjectName]) {
                     groupedData[subjectName] = { grades: {}, absences: {} };
                   }
@@ -275,7 +275,13 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                   });
                 });
 
-                return Object.entries(groupedData).map(([subjectName, data]) => {
+                const entries = Object.entries(groupedData).sort((a, b) => {
+                  if (a[0] === 'FALTAS') return 1;
+                  if (b[0] === 'FALTAS') return -1;
+                  return 0;
+                });
+
+                return entries.map(([subjectName, data]) => {
                   const b1 = data.grades['1º Bimestre'] || 0;
                   const b2 = data.grades['2º Bimestre'] || 0;
                   const b3 = data.grades['3º Bimestre'] || 0;
@@ -296,28 +302,28 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                       <td className="py-4 font-semibold text-slate-800">{subjectName}</td>
                       <td className="py-4 text-center text-slate-500 font-medium">{data.workload ? `${data.workload}h` : '-'}</td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b1 > 0 ? b1.toFixed(2).replace('.', ',') : '-'}</span>
+                        <span className="font-bold">{subjectName === 'FALTAS' ? '-' : (b1 > 0 ? b1.toFixed(2).replace('.', ',') : '-')}</span>
                         <span className="mx-1 text-slate-300">|</span>
                         <span className="text-red-500 text-sm">{f1 > 0 ? f1 : '-'}</span>
                       </td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b2 > 0 ? b2.toFixed(2).replace('.', ',') : '-'}</span>
+                        <span className="font-bold">{subjectName === 'FALTAS' ? '-' : (b2 > 0 ? b2.toFixed(2).replace('.', ',') : '-')}</span>
                         <span className="mx-1 text-slate-300">|</span>
                         <span className="text-red-500 text-sm">{f2 > 0 ? f2 : '-'}</span>
                       </td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b3 > 0 ? b3.toFixed(2).replace('.', ',') : '-'}</span>
+                        <span className="font-bold">{subjectName === 'FALTAS' ? '-' : (b3 > 0 ? b3.toFixed(2).replace('.', ',') : '-')}</span>
                         <span className="mx-1 text-slate-300">|</span>
                         <span className="text-red-500 text-sm">{f3 > 0 ? f3 : '-'}</span>
                       </td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b4 > 0 ? b4.toFixed(2).replace('.', ',') : '-'}</span>
+                        <span className="font-bold">{subjectName === 'FALTAS' ? '-' : (b4 > 0 ? b4.toFixed(2).replace('.', ',') : '-')}</span>
                         <span className="mx-1 text-slate-300">|</span>
                         <span className="text-red-500 text-sm">{f4 > 0 ? f4 : '-'}</span>
                       </td>
                       <td className="py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full font-bold ${media >= 6 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                          {media > 0 ? media.toFixed(2).replace('.', ',') : '-'}
+                        <span className={`px-3 py-1 rounded-full font-bold ${subjectName === 'FALTAS' ? 'bg-slate-100 text-slate-400' : (media >= 6 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')}`}>
+                          {subjectName === 'FALTAS' ? '-' : (media > 0 ? media.toFixed(2).replace('.', ',') : '-')}
                         </span>
                       </td>
                       <td className="py-4 text-center font-bold text-slate-600">
