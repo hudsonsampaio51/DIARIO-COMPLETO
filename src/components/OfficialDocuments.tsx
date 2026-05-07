@@ -319,7 +319,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
 
                   return (
                     <tr key={subjectId}>
-                      <td className="border border-slate-900 p-2">{subjects[subjectId]?.name || 'Disciplina'}</td>
+                      <td className="border border-slate-900 p-2">{subjects[subjectId]?.name || 'FALTAS'}</td>
                       <td className="border border-slate-900 p-2 text-center">{subjects[subjectId]?.workload ? `${subjects[subjectId].workload}h` : '-'}</td>
                       <td className="border border-slate-900 p-2 text-center">Ano Letivo</td>
                       <td className="border border-slate-900 p-2 text-center font-bold">{media > 0 ? media.toFixed(2).replace('.', ',') : '-'}</td>
@@ -398,7 +398,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
 
                   // Process grades
                   studentGrades.forEach(grade => {
-                    const subjectName = subjects[grade.subjectId || '']?.name || 'Disciplina';
+                    const subjectName = subjects[grade.subjectId || '']?.name || 'FALTAS';
                     const workload = subjects[grade.subjectId || '']?.workload;
                     
                     if (!groupedData[subjectName]) {
@@ -413,7 +413,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
 
                   // Process absences
                   Object.entries(studentAbsences).forEach(([subjectId, abs]) => {
-                    const subjectName = subjects[subjectId]?.name || 'Disciplina';
+                    const subjectName = subjects[subjectId]?.name || 'FALTAS';
                     if (!groupedData[subjectName]) {
                       groupedData[subjectName] = { grades: {}, absences: {} };
                     }
