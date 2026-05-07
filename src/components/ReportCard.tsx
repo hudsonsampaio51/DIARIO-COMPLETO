@@ -253,8 +253,9 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
 
                 // Process grades
                 studentGrades.forEach(grade => {
-                  const subjectName = subjects[grade.subjectId || '']?.name || 'Disciplina';
-                  const workload = subjects[grade.subjectId || '']?.workload;
+                  const subjectId = grade.subjectId || 'default';
+                  const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'FALTAS');
+                  const workload = subjects[subjectId]?.workload;
                   
                   if (!groupedData[subjectName]) {
                     groupedData[subjectName] = { grades: {}, absences: {}, workload };
@@ -265,7 +266,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
 
                 // Process absences
                 Object.entries(studentAbsences).forEach(([subjectId, abs]) => {
-                  const subjectName = subjects[subjectId]?.name || 'Disciplina';
+                  const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'FALTAS');
                   if (!groupedData[subjectName]) {
                     groupedData[subjectName] = { grades: {}, absences: {} };
                   }
@@ -278,7 +279,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                 const entries = Object.entries(groupedData).sort((a, b) => {
                   if (a[0] === 'FALTAS') return 1;
                   if (b[0] === 'FALTAS') return -1;
-                  return 0;
+                  return a[0].localeCompare(b[0]);
                 });
 
                 return entries.map(([subjectName, data]) => {
