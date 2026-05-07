@@ -253,7 +253,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
 
                 // Process grades
                 studentGrades.forEach(grade => {
-                  const subjectName = subjects[grade.subjectId || '']?.name || 'Disciplina';
+                  const subjectName = subjects[grade.subjectId || '']?.name || 'FALTAS';
                   const workload = subjects[grade.subjectId || '']?.workload;
                   
                   if (!groupedData[subjectName]) {
@@ -265,7 +265,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
 
                 // Process absences
                 Object.entries(studentAbsences).forEach(([subjectId, abs]) => {
-                  const subjectName = subjects[subjectId]?.name || 'Disciplina';
+                  const subjectName = subjects[subjectId]?.name || 'FALTAS';
                   if (!groupedData[subjectName]) {
                     groupedData[subjectName] = { grades: {}, absences: {} };
                   }
