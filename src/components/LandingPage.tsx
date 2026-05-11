@@ -259,6 +259,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
             </div>
             <div className="text-center text-white/70 text-sm font-medium">
               <p>&copy; {new Date().getFullYear()} SISGES SAMPAIO - Sistema de Gestão Escolar. Todos os direitos reservados.</p>
+              <p>CNPJ 45.695.642/0001-90 - CONSULTORIA EM TECNOLOGIA DA INFORMACAO LTDA</p>
             </div>
           </div>
         </footer>
