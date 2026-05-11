@@ -73,17 +73,42 @@ export const SuperAdminPanel: React.FC = () => {
         return;
       }
 
-      // Pre-register user by email
-      const userRef = doc(collection(db, 'users'));
-      await setDoc(userRef, {
-        email: userFormData.email.toLowerCase(),
-        role: userFormData.role,
-        schoolId: userFormData.schoolId,
-        name: userFormData.name || 'Usuário Pendente',
-        createdAt: new Date().toISOString()
-      });
+      const email = userFormData.email.toLowerCase();
+      // Check if user already exists
+      const q = query(collection(db, 'users'), where('email', '==', email), limit(1));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+          const existingDoc = querySnapshot.docs[0];
+          const existingData = existingDoc.data();
+          let updatedSchoolIds = existingData.schoolIds || [];
+          if (existingData.schoolId && !updatedSchoolIds.includes(existingData.schoolId)) {
+              updatedSchoolIds.push(existingData.schoolId);
+          }
+          if (!updatedSchoolIds.includes(userFormData.schoolId)) {
+              updatedSchoolIds.push(userFormData.schoolId);
+              await updateDoc(doc(db, 'users', existingDoc.id), {
+                  schoolIds: updatedSchoolIds
+              });
+              setFeedback({ message: `Usuário ${email} já existia e foi vinculado à nova escola!`, type: 'success' });
+          } else {
+              setFeedback({ message: `O e-mail ${email} já está vinculado à escola selecionada.`, type: 'error' });
+              return;
+          }
+      } else {
+          // Pre-register user by email
+          const userRef = doc(collection(db, 'users'));
+          await setDoc(userRef, {
+            email: email,
+            role: userFormData.role,
+            schoolId: userFormData.schoolId,
+            schoolIds: [userFormData.schoolId],
+            name: userFormData.name || 'Usuário Pendente',
+            createdAt: new Date().toISOString()
+          });
+          setFeedback({ message: 'Usuário cadastrado com sucesso!', type: 'success' });
+      }
 
-      setFeedback({ message: 'Usuário vinculado com sucesso!', type: 'success' });
       setUserFormData({ email: '', role: 'admin', name: '', schoolId: '' });
       fetchUsers();
     } catch (error) {
@@ -378,7 +403,7 @@ export const SuperAdminPanel: React.FC = () => {
       try {
         const backupData = JSON.parse(event.target?.result as string);
         
-        if (!backupData.collections || backupData.type !== 'global') {
+        if (!backupData.collections || typeof backupData.collections !== 'object' || backupData.type !== 'global') {
           throw new Error('Formato de backup global inválido.');
         }
 
@@ -413,7 +438,8 @@ export const SuperAdminPanel: React.FC = () => {
         fetchUsers();
       } catch (error) {
         console.error("Global restore error:", error);
-        setFeedback({ message: 'Erro na restauração global.', type: 'error' });
+        const errorMessage = error instanceof Error ? error.message : 'Verifique o arquivo.';
+        setFeedback({ message: `Erro na restauração global: ${errorMessage}`, type: 'error' });
       } finally {
         setLoading(false);
         if (e.target) e.target.value = '';

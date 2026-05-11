@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+@media print {
+  body, html, #root {
+    display: block !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+}

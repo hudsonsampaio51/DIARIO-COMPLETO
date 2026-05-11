@@ -5,6 +5,7 @@ import { Student, Class, Attendance, Grade, UserRole, ClassSession, Staff, Subje
 import { Check, X, Save, Calendar, ClipboardCheck, Plus, Trash2, ShieldCheck, AlertCircle, Printer } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { handleFirestoreError, OperationType } from '../utils/errorHandling';
+import { teacherDiaryCache, clearTeacherDiaryCache } from '../utils/dataCache';
 
 interface TeacherDiaryProps {
   teacherId: string;
@@ -220,6 +221,16 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
           const effectiveTeacherId = teacherProfile?.id || teacherId;
           const currentTeacherId = (role === 'admin' || role === 'supervisor') ? filterTeacherId : effectiveTeacherId;
           
+          const cacheKey = `${selectedClass.id}_${currentTeacherId}_${effectiveSchoolId}_${role}_${filterTeacherId}`;
+          if (teacherDiaryCache[cacheKey] && teacherDiaryCache[cacheKey].lastFetch > Date.now() - 300000) {
+            const cached = teacherDiaryCache[cacheKey];
+            setStudents(cached.students);
+            setSubjects(cached.subjects);
+            setOccurrences(cached.occurrences);
+            setLoadingData(false);
+            return;
+          }
+
           const [studentsSnap, subjectsSnap, occurrencesSnap] = await Promise.all([
             getDocs(query(collection(db, 'students'), where('classId', '==', selectedClass.id), where('schoolId', '==', effectiveSchoolId))),
             getDocs((role === 'admin' || role === 'supervisor' || selectedClass.educationLevel === 'Ensino Fundamental I') && !filterTeacherId 
@@ -255,6 +266,14 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
           setSubjects(fetchedSubjects);
           setOccurrences(fetchedOccurrences);
 
+          teacherDiaryCache[cacheKey] = {
+            ...teacherDiaryCache[cacheKey],
+            students: fetchedStudents,
+            subjects: fetchedSubjects,
+            occurrences: fetchedOccurrences,
+            lastFetch: Date.now()
+          };
+
           if (selectedClass.educationLevel === 'Ensino Fundamental I' && mode !== 'grades') {
             setSelectedSubjectId('TODAS');
           } else if (fetchedSubjects.length > 0) {
@@ -273,6 +292,13 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
   }, [selectedClass, filterTeacherId, teacherId, role, teacherProfile, schoolId]);
 
   const fetchSessionsData = async (classId: string, subjectId: string) => {
+    const cacheKey = `${classId}_${subjectId}_sessions`;
+    if (teacherDiaryCache[cacheKey] && teacherDiaryCache[cacheKey].lastFetch > Date.now() - 300000) {
+      const sorted = teacherDiaryCache[cacheKey].sessions;
+      setSessions(sorted);
+      return sorted;
+    }
+
     try {
       let q;
       if (subjectId === 'TODAS') {
@@ -297,6 +323,9 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       });
       
       setSessions(sorted);
+      if (!teacherDiaryCache[cacheKey]) teacherDiaryCache[cacheKey] = { students: [], subjects: [], occurrences: [], sessions: [], schedules: [], attendance: [], grades: [], lastFetch: 0 };
+      teacherDiaryCache[cacheKey].sessions = sorted;
+      teacherDiaryCache[cacheKey].lastFetch = Date.now();
       return sorted;
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, 'classSessions');
@@ -312,7 +341,13 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         where('schoolId', '==', effectiveSchoolId)
       );
       const snap = await getDocs(q);
-      setOccurrences(snap.docs.map(d => ({ id: d.id, ...d.data() as any } as Occurrence)));
+      const fetchedOccurrences = snap.docs.map(d => ({ id: d.id, ...d.data() as any } as Occurrence));
+      setOccurrences(fetchedOccurrences);
+
+      // Update cache
+      Object.keys(teacherDiaryCache).filter(k => k.startsWith(classId + '_')).forEach(k => {
+        teacherDiaryCache[k].occurrences = fetchedOccurrences;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, 'occurrences');
     }
@@ -330,6 +365,11 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         }
       };
       const fetchMonthlyAttendance = async () => {
+        const cacheKey = `${selectedClass.id}_${selectedSubjectId}_attendance`;
+        if (teacherDiaryCache[cacheKey] && teacherDiaryCache[cacheKey].lastFetch > Date.now() - 300000) {
+          setMonthlyAttendance(teacherDiaryCache[cacheKey].attendance);
+          return;
+        }
         try {
           let q;
           if (selectedSubjectId === 'TODAS') {
@@ -345,14 +385,18 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
             );
           }
           const snap = await getDocs(q);
-          setMonthlyAttendance(snap.docs.map(d => ({ id: d.id, ...d.data() as any } as Attendance)));
+          const fetchedAttendance = snap.docs.map(d => ({ id: d.id, ...d.data() as any } as Attendance));
+          setMonthlyAttendance(fetchedAttendance);
+          
+          if (!teacherDiaryCache[cacheKey]) teacherDiaryCache[cacheKey] = { students: [], subjects: [], occurrences: [], sessions: [], schedules: [], attendance: [], grades: [], lastFetch: 0 };
+          teacherDiaryCache[cacheKey].attendance = fetchedAttendance;
+          teacherDiaryCache[cacheKey].lastFetch = Date.now();
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, 'attendance');
         }
       };
       fetchSessions();
       fetchMonthlyAttendance();
-      fetchOccurrences(selectedClass.id);
     }
   }, [selectedClass, selectedSubjectId, period, selectedReportMonth]);
 
@@ -401,6 +445,16 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
   useEffect(() => {
     if (selectedClass && mode === 'grades') {
       const fetchGrades = async () => {
+        const cacheKey = `${selectedClass.id}_${selectedSubjectId}_${period}_grades`;
+        if (teacherDiaryCache[cacheKey] && teacherDiaryCache[cacheKey].lastFetch > Date.now() - 300000) {
+          if (selectedClass.educationLevel === 'Ensino Fundamental I') {
+            setConsolidatedGrades(teacherDiaryCache[cacheKey].grades as Record<string, Record<string, Partial<Grade>>>);
+          } else {
+            setGrades(teacherDiaryCache[cacheKey].grades as Record<string, Partial<Grade>>);
+          }
+          return;
+        }
+
         try {
           let q;
           if (selectedClass.educationLevel === 'Ensino Fundamental I') {
@@ -422,6 +476,8 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
 
           const snap = await getDocs(q);
           
+          if (!teacherDiaryCache[cacheKey]) teacherDiaryCache[cacheKey] = { students: [], subjects: [], occurrences: [], sessions: [], schedules: [], attendance: [], grades: [], lastFetch: 0 };
+
           if (selectedClass.educationLevel === 'Ensino Fundamental I') {
             const fetched: Record<string, Record<string, Partial<Grade>>> = {};
             snap.docs.forEach(d => {
@@ -432,6 +488,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
               }
             });
             setConsolidatedGrades(fetched);
+            teacherDiaryCache[cacheKey].grades = fetched as any;
           } else {
             const fetched: Record<string, Partial<Grade>> = {};
             snap.docs.forEach(d => {
@@ -439,7 +496,9 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
               fetched[data.studentId] = { ...data, id: d.id };
             });
             setGrades(fetched);
+            teacherDiaryCache[cacheKey].grades = fetched as any;
           }
+          teacherDiaryCache[cacheKey].lastFetch = Date.now();
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, 'grades');
         }
@@ -501,6 +560,11 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       const subjectsSnap = await getDocs(subjectsQuery);
       const fetchedSubjects = subjectsSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Subject));
       setSubjects(fetchedSubjects);
+
+      Object.keys(teacherDiaryCache).filter(k => k.startsWith(selectedClass.id + '_')).forEach(k => {
+        teacherDiaryCache[k].subjects = fetchedSubjects;
+      });
+
       if (fetchedSubjects.length > 0 && !selectedSubjectId) {
         setSelectedSubjectId(fetchedSubjects[0].id);
       }
@@ -607,6 +671,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       setNewSessionSpecialType('');
       setNewSessionSubjectId('');
       setFeedback({ message: 'Aula registrada com sucesso!', type: 'success' });
+      clearTeacherDiaryCache(selectedClass.id);
       
       await fetchSessionsData(selectedClass.id, selectedSubjectId);
     } catch (error) {
@@ -621,6 +686,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         description: editingContent
       });
       setSessions(sessions.map(s => s.id === selectedSessionId ? { ...s, description: editingContent } : s));
+      clearTeacherDiaryCache(selectedClass.id);
       setFeedback({ message: 'Conteúdo atualizado!', type: 'success' });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'classSessions');
@@ -778,6 +844,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       await deleteDoc(doc(db, 'classSessions', sessionId));
       setSessions(sessions.filter(s => s.id !== sessionId));
       setShowConfirmModal(null);
+      if (selectedClass) clearTeacherDiaryCache(selectedClass.id);
       setFeedback({ message: 'Data de aula excluída!', type: 'success' });
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, 'classSessions');
@@ -821,6 +888,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
       });
       await Promise.all(promises);
       setFeedback({ message: 'Frequência salva com sucesso!', type: 'success' });
+      clearTeacherDiaryCache(selectedClass.id);
       
       // Refresh monthly attendance
       let q;
@@ -911,6 +979,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         });
         await Promise.all(promises);
       }
+      clearTeacherDiaryCache(selectedClass.id);
       setFeedback({ message: 'Notas salvas com sucesso!', type: 'success' });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'grades');
@@ -941,6 +1010,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
     try {
       await deleteDoc(doc(db, 'occurrences', id));
       setOccurrences(occurrences.filter(o => o.id !== id));
+      if (selectedClass) clearTeacherDiaryCache(selectedClass.id);
       setFeedback({ message: 'Ocorrência excluída!', type: 'success' });
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, 'occurrences');

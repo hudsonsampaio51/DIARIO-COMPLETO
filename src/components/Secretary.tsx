@@ -92,9 +92,12 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
       const subjectsSnap = await getDocs(qSubjects);
       setSubjects(subjectsSnap.docs.map(d => ({ id: d.id, ...d.data() as any } as Subject)));
 
-      const qUsers = query(collection(db, 'users'), where('schoolId', '==', schoolId));
-      const usersSnap = await getDocs(qUsers);
-      setUsers(usersSnap.docs.map(d => ({ ...d.data(), uid: d.id } as UserProfile)));
+      const qUsers1 = query(collection(db, 'users'), where('schoolId', '==', schoolId));
+      const qUsers2 = query(collection(db, 'users'), where('schoolIds', 'array-contains', schoolId));
+      const [usersSnap1, usersSnap2] = await Promise.all([getDocs(qUsers1), getDocs(qUsers2)]);
+      const allUserDocs = [...usersSnap1.docs, ...usersSnap2.docs];
+      const uniqueUsers = Array.from(new Map(allUserDocs.map(d => [d.id, d])).values());
+      setUsers(uniqueUsers.map(d => ({ ...d.data(), uid: d.id } as UserProfile)));
 
       const schoolSnap = await getDoc(doc(db, 'schools', schoolId));
       if (schoolSnap.exists()) {
@@ -138,33 +141,47 @@ export const Secretary: React.FC<SecretaryProps> = ({ schoolId }) => {
         if (editingId) {
           await updateDoc(doc(db, 'users', editingId), { 
             role: data.role, 
-            name: data.name,
-            schoolId: schoolId 
+            name: data.name
           });
           setFeedback({ message: 'Papel do usuário atualizado com sucesso!', type: 'success' });
         } else {
-          // Check if user already exists by email in this school
-          const q = query(collection(db, 'users'), where('email', '==', email), where('schoolId', '==', schoolId), limit(1));
+          // Check if user already exists by email at all
+          const q = query(collection(db, 'users'), where('email', '==', email), limit(1));
           const querySnapshot = await getDocs(q);
           
           if (!querySnapshot.empty) {
-            const existingUser = querySnapshot.docs[0].data();
-            setFeedback({ 
-              message: `O e-mail ${email} já está cadastrado para o usuário "${existingUser.name || 'Sem Nome'}".`, 
-              type: 'error' 
+            const existingUserDoc = querySnapshot.docs[0];
+            const existingUser = existingUserDoc.data();
+            
+            let updatedSchoolIds = existingUser.schoolIds || [];
+            if (existingUser.schoolId && !updatedSchoolIds.includes(existingUser.schoolId)) {
+                updatedSchoolIds.push(existingUser.schoolId);
+            }
+            if (!updatedSchoolIds.includes(schoolId)) {
+                updatedSchoolIds.push(schoolId);
+                await updateDoc(doc(db, 'users', existingUserDoc.id), {
+                    schoolIds: updatedSchoolIds
+                });
+                setFeedback({ message: `O usuário ${existingUser.name || email} já existia e foi vinculado à sua escola com sucesso!`, type: 'success' });
+            } else {
+                setFeedback({ 
+                  message: `O e-mail ${email} já está vinculado à sua escola.`, 
+                  type: 'error' 
+                });
+                return;
+            }
+          } else {
+            // Create a new user profile completely
+            await addDoc(collection(db, 'users'), {
+              name: data.name,
+              email: email,
+              role: data.role,
+              schoolId: schoolId,
+              schoolIds: [schoolId],
+              createdAt: new Date().toISOString()
             });
-            return;
+            setFeedback({ message: 'Usuário cadastrado com sucesso!', type: 'success' });
           }
-
-          // Create a new user profile. 
-          await addDoc(collection(db, 'users'), {
-            name: data.name,
-            email: email,
-            role: data.role,
-            schoolId: schoolId,
-            createdAt: new Date().toISOString()
-          });
-          setFeedback({ message: 'Usuário cadastrado com sucesso!', type: 'success' });
         }
         setShowModal(false);
         fetchData();

@@ -8,6 +8,12 @@ export interface Address {
   cep: string;
 }
 
+export interface AcademicPeriod {
+  name: string;
+  startDate: string;
+  endDate: string;
+}
+
 export interface School {
   id: string;
   name: string;
@@ -24,6 +30,7 @@ export interface School {
   schoolCode: string;
   schoolYear: string;
   logoUrl?: string;
+  academicPeriods?: AcademicPeriod[];
   createdAt: string;
 }
 
@@ -33,6 +40,7 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   schoolId?: string;
+  schoolIds?: string[];
   createdAt: string;
 }
 

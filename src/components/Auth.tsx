@@ -4,67 +4,160 @@ import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from
 import { doc, getDoc, setDoc, query, collection, where, limit, getDocs, deleteDoc } from 'firebase/firestore';
 import { UserProfile, UserRole } from '../types';
 import { LogIn, LogOut, User as UserIcon, BookOpen, Users } from 'lucide-react';
+import { handleFirestoreError, OperationType } from '../utils/errorHandling';
+
+import { LandingPage } from './LandingPage';
 
 export const Auth: React.FC<{ onUserChange: (user: UserProfile | null) => void }> = ({ onUserChange }) => {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [showRoleSelection, setShowRoleSelection] = useState<UserProfile | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        if (userDoc.exists()) {
-          let profile = userDoc.data() as UserProfile;
+        try {
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
           
-          // Force superadmin role for the specific admin email
-          if (firebaseUser.email === 'admin@eadmatosinho.com' && profile.role !== 'superadmin') {
-            profile = { ...profile, role: 'superadmin' };
-            await setDoc(doc(db, 'users', firebaseUser.uid), profile);
-          }
-          
-          setUser(profile);
-          onUserChange(profile);
-        } else {
-          // Check if user was pre-registered by email
-          const userEmail = firebaseUser.email?.toLowerCase();
-          const q = query(collection(db, 'users'), where('email', '==', userEmail), limit(1));
-          const querySnapshot = await getDocs(q);
-          
-          if (!querySnapshot.empty) {
-            const preRegDoc = querySnapshot.docs[0];
-            const preRegData = preRegDoc.data();
-            const profile: UserProfile = {
-              ...preRegData as UserProfile,
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || preRegData.name || 'Usuário'
-            };
-            await setDoc(doc(db, 'users', firebaseUser.uid), profile);
-            if (preRegDoc.id !== firebaseUser.uid) {
-              await deleteDoc(preRegDoc.ref);
+          if (userDoc.exists()) {
+            let profile = userDoc.data() as UserProfile;
+            
+            // Auto-detect schools from staff collection by email
+            if (firebaseUser.email) {
+              const staffQ = query(collection(db, 'staff'), where('email', '==', firebaseUser.email.toLowerCase()));
+              try {
+                const staffSnap = await getDocs(staffQ);
+                if (!staffSnap.empty) {
+                  const staffSchoolIds = staffSnap.docs.map(d => d.data().schoolId).filter(Boolean);
+                  const uniqueStaffSchoolIds = [...new Set(staffSchoolIds)];
+                  
+                  let updated = false;
+                  let newSchoolIds = profile.schoolIds ? [...profile.schoolIds] : [];
+                  
+                  if (profile.schoolId && !newSchoolIds.includes(profile.schoolId)) {
+                    newSchoolIds.push(profile.schoolId);
+                    updated = true;
+                  }
+
+                  for (const sid of uniqueStaffSchoolIds) {
+                    if (sid && !newSchoolIds.includes(sid)) {
+                      newSchoolIds.push(sid);
+                      updated = true;
+                    }
+                  }
+
+                  if (updated) {
+                    profile = { ...profile, schoolIds: newSchoolIds };
+                    await setDoc(userDocRef, profile, { merge: true });
+                  }
+                }
+              } catch (e) {
+                console.warn("Could not check staff collections for additional schools");
+              }
             }
+            
+            // Force superadmin role for the specific admin email
+            if (firebaseUser.email === 'admin@eadmatosinho.com' && profile.role !== 'superadmin') {
+              profile = { ...profile, role: 'superadmin' };
+              await setDoc(userDocRef, profile);
+            }
+            
             setUser(profile);
             onUserChange(profile);
           } else {
-            // New user - show role selection
-            const newProfile: UserProfile = {
-              uid: firebaseUser.uid,
-              name: firebaseUser.displayName || 'Usuário',
-              email: firebaseUser.email || '',
-              role: 'teacher', // default
-              createdAt: new Date().toISOString(),
-            };
+            // Check if user was pre-registered by email
+            const userEmail = firebaseUser.email?.toLowerCase();
+            let preRegProfile: UserProfile | null = null;
+            let preRegDocId: string | null = null;
             
-            // If it's the specific admin email, auto-assign superadmin
-            if (firebaseUser.email === 'admin@eadmatosinho.com') {
-              newProfile.role = 'superadmin';
-              await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
-              setUser(newProfile);
-              onUserChange(newProfile);
+            try {
+              const q = query(collection(db, 'users'), where('email', '==', userEmail), limit(1));
+              const querySnapshot = await getDocs(q);
+              
+              if (!querySnapshot.empty) {
+                const preRegDoc = querySnapshot.docs[0];
+                const preRegData = preRegDoc.data();
+                preRegDocId = preRegDoc.id;
+                preRegProfile = {
+                  ...preRegData as UserProfile,
+                  uid: firebaseUser.uid,
+                  name: firebaseUser.displayName || preRegData.name || 'Usuário'
+                };
+              }
+            } catch (error) {
+              console.warn("Could not fetch pre-registration data:", error);
+            }
+
+            // Fallback to staff collection if no user pre-registration found
+            if (!preRegProfile && userEmail) {
+              try {
+                const staffQ = query(collection(db, 'staff'), where('email', '==', userEmail));
+                const staffSnap = await getDocs(staffQ);
+                if (!staffSnap.empty) {
+                  const staffDocs = staffSnap.docs.map(d => d.data());
+                  const staffSchoolIds = [...new Set(staffDocs.map(d => d.schoolId).filter(Boolean))];
+                  
+                  // Map staff role to user role
+                  const roleMap: Record<string, UserRole> = {
+                    'Professor': 'teacher',
+                    'Diretor': 'admin',
+                    'Administrador': 'admin',
+                    'Secretaria': 'secretary',
+                    'Auxiliar Administrativo': 'secretary',
+                    'Supervisor': 'supervisor'
+                  };
+                  const staffRole = staffDocs[0].role;
+                  const userRole: UserRole = roleMap[staffRole] || 'teacher';
+
+                  preRegProfile = {
+                    uid: firebaseUser.uid,
+                    name: firebaseUser.displayName || staffDocs[0].firstName + ' ' + (staffDocs[0].lastName || '') || 'Usuário',
+                    email: userEmail,
+                    role: userRole,
+                    schoolId: staffSchoolIds[0],
+                    schoolIds: staffSchoolIds,
+                    createdAt: new Date().toISOString()
+                  };
+                }
+              } catch (e) {
+                console.warn("Could not fetch staff fallback data:", e);
+              }
+            }
+            
+            if (preRegProfile) {
+              await setDoc(doc(db, 'users', firebaseUser.uid), preRegProfile);
+              if (preRegDocId && preRegDocId !== firebaseUser.uid) {
+                try {
+                  await deleteDoc(doc(db, 'users', preRegDocId));
+                } catch (e) {
+                  console.warn("Could not delete old pre-registration doc", e);
+                }
+              }
+              setUser(preRegProfile);
+              onUserChange(preRegProfile);
             } else {
-              setShowRoleSelection(newProfile);
+              // If it's the specific admin email, auto-assign superadmin
+              if (firebaseUser.email === 'admin@eadmatosinho.com') {
+                const newProfile: UserProfile = {
+                  uid: firebaseUser.uid,
+                  name: firebaseUser.displayName || 'Usuário',
+                  email: firebaseUser.email || '',
+                  role: 'superadmin',
+                  createdAt: new Date().toISOString(),
+                };
+                await setDoc(doc(db, 'users', firebaseUser.uid), newProfile);
+                setUser(newProfile);
+                onUserChange(newProfile);
+              } else {
+                await signOut(auth);
+                setAuthError("Acesso negado. Seu email não está cadastrado no sistema. Solicite acesso à administração.");
+              }
             }
           }
+        } catch (error) {
+          handleFirestoreError(error, OperationType.GET, 'users');
         }
       } else {
         setUser(null);
@@ -79,11 +172,15 @@ export const Auth: React.FC<{ onUserChange: (user: UserProfile | null) => void }
 
   const handleRoleSelect = async (role: UserRole) => {
     if (showRoleSelection) {
-      const profile = { ...showRoleSelection, role };
-      await setDoc(doc(db, 'users', profile.uid), profile);
-      setUser(profile);
-      onUserChange(profile);
-      setShowRoleSelection(null);
+      try {
+        const profile = { ...showRoleSelection, role };
+        await setDoc(doc(db, 'users', profile.uid), profile);
+        setUser(profile);
+        onUserChange(profile);
+        setShowRoleSelection(null);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.WRITE, `users/${showRoleSelection.uid}`);
+      }
     }
   };
 
@@ -117,7 +214,7 @@ export const Auth: React.FC<{ onUserChange: (user: UserProfile | null) => void }
     handleLogin();
   };
 
-  if (loading) return null;
+  if (loading) return <div className="flex items-center justify-center h-screen">Carregando...</div>;
 
   if (showRoleSelection) {
     return (
@@ -157,11 +254,23 @@ export const Auth: React.FC<{ onUserChange: (user: UserProfile | null) => void }
   }
 
   if (!user) {
-    return null;
+    return (
+      <div className="relative">
+        {authError && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[100] bg-red-100 border border-red-400 text-red-700 px-6 py-3 rounded-xl shadow-lg flex items-center justify-between gap-4 max-w-md w-full">
+            <span className="text-sm font-semibold">{authError}</span>
+            <button onClick={() => setAuthError(null)} className="text-red-500 hover:text-red-700 font-bold">
+              &times;
+            </button>
+          </div>
+        )}
+        <LandingPage onLogin={handleLogin} />
+      </div>
+    );
   }
 
   return (
-    <div className="flex items-center gap-4 px-4 py-2 bg-white border-b border-slate-200">
+    <div className="flex items-center gap-4 px-4 py-2 bg-white border-b border-slate-200 print:hidden">
       <div className="flex-1 flex items-center gap-3">
         <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
           <UserIcon className="text-slate-600 w-5 h-5" />

@@ -4,6 +4,7 @@ import { collection, getDocs, query, where, doc, onSnapshot, getDoc } from 'fire
 import { Student, Grade, Class } from '../types';
 import { GraduationCap, Search, Printer, Download, AlertCircle } from 'lucide-react';
 import { handleFirestoreError } from '../utils/errorHandling';
+import { schoolDataCache, studentGradesCache } from '../utils/dataCache';
 
 interface ReportCardProps {
   schoolId: string;
@@ -43,6 +44,17 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
   useEffect(() => {
     const fetchData = async () => {
       if (!schoolId) return;
+
+      if (schoolDataCache.schoolId === schoolId && schoolDataCache.students && schoolDataCache.classList && schoolDataCache.subjects) {
+        setStudents(schoolDataCache.students);
+        setClassList(schoolDataCache.classList);
+        const classMap: Record<string, string> = {};
+        schoolDataCache.classList.forEach(c => { classMap[c.id] = c.name; });
+        setClasses(classMap);
+        setSubjects(schoolDataCache.subjects);
+        return;
+      }
+
       try {
         const qStudents = query(collection(db, 'students'), where('schoolId', '==', schoolId));
         const studentsSnap = await getDocs(qStudents);
@@ -86,6 +98,12 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
           subjectMap[d.id] = { name: data.name, workload: data.workload };
         });
         setSubjects(subjectMap);
+
+        schoolDataCache.schoolId = schoolId;
+        schoolDataCache.students = fetchedStudents;
+        schoolDataCache.classList = fetchedClasses;
+        schoolDataCache.subjects = subjectMap;
+        schoolDataCache.lastFetch = Date.now();
       } catch (error) {
         handleFirestoreError(error, 'list' as any, 'students/classes');
         setError('Erro ao carregar dados. Por favor, tente novamente.');
@@ -97,6 +115,12 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
   useEffect(() => {
     if (selectedStudent) {
       const fetchGradesAndAttendance = async () => {
+        if (studentGradesCache[selectedStudent.id]) {
+          setGrades(studentGradesCache[selectedStudent.id].grades);
+          setAbsences(studentGradesCache[selectedStudent.id].absences);
+          return;
+        }
+
         try {
           // Remove schoolId filter to ensure backward compatibility with older records
           const qGrades = query(
@@ -104,7 +128,8 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
             where('studentId', '==', selectedStudent.id)
           );
           const snapGrades = await getDocs(qGrades);
-          setGrades(snapGrades.docs.map(d => ({ id: d.id, ...d.data() as any } as Grade)));
+          const fetchedGrades = snapGrades.docs.map(d => ({ id: d.id, ...d.data() as any } as Grade));
+          setGrades(fetchedGrades);
 
           const qAttendance = query(
             collection(db, 'attendance'),
@@ -121,6 +146,12 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
             absencesMap[subjectId][period] = (absencesMap[subjectId][period] || 0) + 1;
           });
           setAbsences(absencesMap as any);
+
+          studentGradesCache[selectedStudent.id] = {
+            grades: fetchedGrades,
+            absences: absencesMap,
+            lastFetch: Date.now()
+          };
         } catch (error) {
           handleFirestoreError(error, 'list' as any, 'grades/attendance');
           setError('Erro ao carregar notas e faltas do aluno.');
@@ -202,7 +233,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
 
   const renderReportCard = (student: Student, studentGrades: Grade[], studentAbsences: Record<string, Record<string, number>>, isBulk = false) => {
     return (
-      <div key={student.id} className={`bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden ${isBulk ? 'print:shadow-none print:border-none mb-8 page-break-after-always' : ''}`}>
+      <div key={student.id} className={`bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden print:overflow-visible ${isBulk ? 'print:shadow-none print:border-none mb-8 page-break-after-always' : ''}`}>
         <div className="p-8 bg-slate-900 text-white">
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-4">
@@ -253,8 +284,9 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
 
                 // Process grades
                 studentGrades.forEach(grade => {
-                  const subjectName = subjects[grade.subjectId || '']?.name || 'Disciplina';
-                  const workload = subjects[grade.subjectId || '']?.workload;
+                  const subjectId = grade.subjectId || 'default';
+                  const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'FALTAS');
+                  const workload = subjects[subjectId]?.workload;
                   
                   if (!groupedData[subjectName]) {
                     groupedData[subjectName] = { grades: {}, absences: {}, workload };
@@ -264,18 +296,33 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                 });
 
                 // Process absences
+                const globalAbsences: Record<string, number> = {};
                 Object.entries(studentAbsences).forEach(([subjectId, abs]) => {
-                  const subjectName = subjects[subjectId]?.name || 'Disciplina';
+                  const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'FALTAS');
                   if (!groupedData[subjectName]) {
                     groupedData[subjectName] = { grades: {}, absences: {} };
                   }
                   
                   Object.entries(abs as Record<string, number>).forEach(([period, count]) => {
                     groupedData[subjectName].absences[period] = (groupedData[subjectName].absences[period] || 0) + count;
+                    globalAbsences[period] = (globalAbsences[period] || 0) + count;
                   });
                 });
 
-                return Object.entries(groupedData).map(([subjectName, data]) => {
+                if (classList.find(c => c.id === student.classId)?.educationLevel !== 'Ensino Fundamental I' && Object.keys(studentAbsences).length > 0) {
+                  if (!groupedData['FALTAS']) {
+                    groupedData['FALTAS'] = { grades: {}, absences: {} };
+                  }
+                  groupedData['FALTAS'].absences = globalAbsences;
+                }
+
+                const entries = Object.entries(groupedData).sort((a, b) => {
+                  if (a[0] === 'FALTAS') return 1;
+                  if (b[0] === 'FALTAS') return -1;
+                  return a[0].localeCompare(b[0]);
+                });
+
+                return entries.map(([subjectName, data]) => {
                   const b1 = data.grades['1º Bimestre'] || 0;
                   const b2 = data.grades['2º Bimestre'] || 0;
                   const b3 = data.grades['3º Bimestre'] || 0;
@@ -296,28 +343,28 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                       <td className="py-4 font-semibold text-slate-800">{subjectName}</td>
                       <td className="py-4 text-center text-slate-500 font-medium">{data.workload ? `${data.workload}h` : '-'}</td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b1 > 0 ? b1.toFixed(2).replace('.', ',') : '-'}</span>
+                        <span className="font-bold">{subjectName === 'FALTAS' ? '-' : (b1 > 0 ? b1.toFixed(2).replace('.', ',') : '-')}</span>
                         <span className="mx-1 text-slate-300">|</span>
-                        <span className="text-red-500 text-sm">{f1 > 0 ? f1 : '-'}</span>
+                        <span className="text-red-500 text-sm">{subjectName === 'FALTAS' ? f1 : (f1 > 0 ? f1 : '-')}</span>
                       </td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b2 > 0 ? b2.toFixed(2).replace('.', ',') : '-'}</span>
+                        <span className="font-bold">{subjectName === 'FALTAS' ? '-' : (b2 > 0 ? b2.toFixed(2).replace('.', ',') : '-')}</span>
                         <span className="mx-1 text-slate-300">|</span>
-                        <span className="text-red-500 text-sm">{f2 > 0 ? f2 : '-'}</span>
+                        <span className="text-red-500 text-sm">{subjectName === 'FALTAS' ? f2 : (f2 > 0 ? f2 : '-')}</span>
                       </td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b3 > 0 ? b3.toFixed(2).replace('.', ',') : '-'}</span>
+                        <span className="font-bold">{subjectName === 'FALTAS' ? '-' : (b3 > 0 ? b3.toFixed(2).replace('.', ',') : '-')}</span>
                         <span className="mx-1 text-slate-300">|</span>
-                        <span className="text-red-500 text-sm">{f3 > 0 ? f3 : '-'}</span>
+                        <span className="text-red-500 text-sm">{subjectName === 'FALTAS' ? f3 : (f3 > 0 ? f3 : '-')}</span>
                       </td>
                       <td className="py-4 text-center text-slate-500">
-                        <span className="font-bold">{b4 > 0 ? b4.toFixed(2).replace('.', ',') : '-'}</span>
+                        <span className="font-bold">{subjectName === 'FALTAS' ? '-' : (b4 > 0 ? b4.toFixed(2).replace('.', ',') : '-')}</span>
                         <span className="mx-1 text-slate-300">|</span>
-                        <span className="text-red-500 text-sm">{f4 > 0 ? f4 : '-'}</span>
+                        <span className="text-red-500 text-sm">{subjectName === 'FALTAS' ? f4 : (f4 > 0 ? f4 : '-')}</span>
                       </td>
                       <td className="py-4 text-center">
-                        <span className={`px-3 py-1 rounded-full font-bold ${media >= 6 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                          {media > 0 ? media.toFixed(2).replace('.', ',') : '-'}
+                        <span className={`px-3 py-1 rounded-full font-bold ${subjectName === 'FALTAS' ? 'bg-slate-100 text-slate-400' : (media >= 6 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')}`}>
+                          {subjectName === 'FALTAS' ? '-' : (media > 0 ? media.toFixed(2).replace('.', ',') : '-')}
                         </span>
                       </td>
                       <td className="py-4 text-center font-bold text-slate-600">
@@ -357,14 +404,14 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-8 print:p-0 print:m-0">
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .print-container, .print-container * { visibility: visible; }
-          .print-container { position: absolute; left: 0; top: 0; width: 100%; }
+          @page { margin: 1cm; size: landscape; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; }
           .no-print { display: none !important; }
-          .page-break-after-always { page-break-after: always; }
+          .print-container { display: block !important; width: 100%; }
+          .page-break-after-always { page-break-after: always; break-after: page; }
         }
       `}</style>
 
