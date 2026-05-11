@@ -170,8 +170,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 },
                 {
                   name: "Roberto Almeida",
-                  role: "Gestor Financeiro",
-                  content: "O melhor investimento da nossa instituição. Os agendamentos e o controle de pagamentos ficaram perfeitamente organizados e seguros.",
+                  role: "Professor",
+                  content: "Prático, simples e eficiente!!!",
                   school: "Colégio Futuro"
                 },
                 {
