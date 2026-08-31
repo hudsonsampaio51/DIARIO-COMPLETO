@@ -365,11 +365,8 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
         }
       };
       const fetchMonthlyAttendance = async () => {
-        const cacheKey = `${selectedClass.id}_${selectedSubjectId}_attendance`;
-        if (teacherDiaryCache[cacheKey] && teacherDiaryCache[cacheKey].lastFetch > Date.now() - 300000) {
-          setMonthlyAttendance(teacherDiaryCache[cacheKey].attendance);
-          return;
-        }
+        // Always fetch fresh data - don't use cache for attendance
+        // because it needs to include all months for the report
         try {
           let q;
           if (selectedSubjectId === 'TODAS') {
@@ -387,10 +384,6 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
           const snap = await getDocs(q);
           const fetchedAttendance = snap.docs.map(d => ({ id: d.id, ...d.data() as any } as Attendance));
           setMonthlyAttendance(fetchedAttendance);
-          
-          if (!teacherDiaryCache[cacheKey]) teacherDiaryCache[cacheKey] = { students: [], subjects: [], occurrences: [], sessions: [], schedules: [], attendance: [], grades: [], lastFetch: 0 };
-          teacherDiaryCache[cacheKey].attendance = fetchedAttendance;
-          teacherDiaryCache[cacheKey].lastFetch = Date.now();
         } catch (error) {
           handleFirestoreError(error, OperationType.GET, 'attendance');
         }
@@ -2030,12 +2023,19 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                 </thead>
                 <tbody>
                   {students.map((student, idx) => {
-                    const studentAbsences = monthlyAttendance.filter(a => 
-                      a.studentId === student.id && 
-                      a.status === 'absent' &&
-                      (!a.subjectId || a.subjectId === selectedSubjectId) &&
-                      filteredSessions.some(s => s.id === a.sessionId)
-                    ).length;
+                    const studentAbsences = monthlyAttendance.filter(a => {
+                      // Count absences that match the selected month
+                      const attDate = new Date(a.date + 'T12:00:00');
+                      const isCorrectMonth = attDate.getMonth() + 1 === selectedReportMonth;
+
+                      // If "TODAS" is selected, include all subjects; otherwise match the specific subject
+                      const isCorrectSubject = selectedSubjectId === 'TODAS' || !a.subjectId || a.subjectId === selectedSubjectId;
+
+                      return a.studentId === student.id &&
+                             a.status === 'absent' &&
+                             isCorrectSubject &&
+                             isCorrectMonth;
+                    }).length;
                     
                     const isCurrentlyTransferred = student.status === 'transferred';
 
