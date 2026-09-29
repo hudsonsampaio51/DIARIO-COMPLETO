@@ -115,11 +115,12 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
   useEffect(() => {
     if (selectedStudent) {
       const fetchGradesAndAttendance = async () => {
-        if (studentGradesCache[selectedStudent.id]) {
-          setGrades(studentGradesCache[selectedStudent.id].grades);
-          setAbsences(studentGradesCache[selectedStudent.id].absences);
-          return;
-        }
+        // Don't use cache - always fetch fresh to ensure Math.max deduplication works
+        // if (studentGradesCache[selectedStudent.id]) {
+        //   setGrades(studentGradesCache[selectedStudent.id].grades);
+        //   setAbsences(studentGradesCache[selectedStudent.id].absences);
+        //   return;
+        // }
 
         try {
           // Remove schoolId filter to ensure backward compatibility with older records
@@ -147,11 +148,12 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
           });
           setAbsences(absencesMap as any);
 
-          studentGradesCache[selectedStudent.id] = {
-            grades: fetchedGrades,
-            absences: absencesMap,
-            lastFetch: Date.now()
-          };
+          // Don't cache - always fetch fresh
+          // studentGradesCache[selectedStudent.id] = {
+          //   grades: fetchedGrades,
+          //   absences: absencesMap,
+          //   lastFetch: Date.now()
+          // };
         } catch (error) {
           handleFirestoreError(error, 'list' as any, 'grades/attendance');
           setError('Erro ao carregar notas e faltas do aluno.');
