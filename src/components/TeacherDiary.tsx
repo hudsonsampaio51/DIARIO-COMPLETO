@@ -1950,7 +1950,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                       </div>
                     </div>
                     <p className="whitespace-nowrap">PROFESSOR/A: {currentTeacherName}</p>
-                    <p className="whitespace-nowrap">DISCIPLINA: {selectedSubjectId === 'TODAS' ? 'TODAS AS DISCIPLINAS' : (currentSubject?.name || '---')}</p>
+                    <p className="whitespace-nowrap">Componente Curricular: {selectedSubjectId === 'TODAS' ? 'TODAS AS DISCIPLINAS' : (currentSubject?.name || '---')}</p>
                   </div>
                   
                   <div className="flex gap-4 sm:gap-8 flex-shrink-0">
@@ -2126,7 +2126,7 @@ export const TeacherDiary: React.FC<TeacherDiaryProps> = ({ teacherId, role, sch
                     <th className="border border-slate-900 p-2 text-center" rowSpan={selectedClass?.educationLevel === 'Ensino Fundamental II' ? 2 : 1}>
                       {(selectedClass?.educationLevel === 'Educação Infantil' || selectedClass?.educationLevel === 'Creche') 
                         ? 'OBJETO DE APRENDIZAGEM E DESENVOLVIMENTO' 
-                        : 'OBJETO DO CONHECIMENTO / CONTEÚDO'}
+                        : 'OBJETO DO CONHECIMENTO'}
                     </th>
                   </tr>
                   {selectedClass?.educationLevel === 'Ensino Fundamental II' && (
