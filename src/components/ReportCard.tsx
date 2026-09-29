@@ -287,11 +287,13 @@ export const ReportCard: React.FC<ReportCardProps> = ({ schoolId }) => {
                   const subjectId = grade.subjectId || 'default';
                   const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'FALTAS');
                   const workload = subjects[subjectId]?.workload;
-                  
+
                   if (!groupedData[subjectName]) {
                     groupedData[subjectName] = { grades: {}, absences: {}, workload };
                   }
-                  groupedData[subjectName].grades[grade.period] = grade.value;
+                  // Keep the highest grade value if there are duplicates
+                  const currentGrade = groupedData[subjectName].grades[grade.period];
+                  groupedData[subjectName].grades[grade.period] = currentGrade ? Math.max(currentGrade, grade.value) : grade.value;
                   if (workload) groupedData[subjectName].workload = workload;
                 });
 
