@@ -117,11 +117,7 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
   useEffect(() => {
     if (selectedStudent && (docType === 'transcript' || docType === 'boletim')) {
       const fetchGradesAndAttendance = async () => {
-        if (studentGradesCache[selectedStudent.id]) {
-          setGrades(studentGradesCache[selectedStudent.id].grades);
-          setAbsences(studentGradesCache[selectedStudent.id].absences);
-          return;
-        }
+        // Don't use cache - always fetch fresh so the document matches the Boletins screen
 
         try {
           const qGrades = query(
@@ -353,8 +349,13 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
 
                   return sortedSubjectIds.map((subjectId) => {
                     const subjectName = subjectId === 'default' ? 'FALTAS' : (subjects[subjectId]?.name || 'FALTAS');
-                    const subjectGradesList = studentGrades.filter(g => (g.subjectId || 'default') === subjectId);
-                  const rawMedia = subjectGradesList.length > 0 ? subjectGradesList.reduce((acc, g) => acc + g.value, 0) / subjectGradesList.length : 0;
+                    // Deduplicate by period keeping the highest grade (same rule as ReportCard)
+                    const periodGrades: Record<string, number> = {};
+                    studentGrades.filter(g => (g.subjectId || 'default') === subjectId).forEach(g => {
+                      periodGrades[g.period] = periodGrades[g.period] ? Math.max(periodGrades[g.period], g.value) : g.value;
+                    });
+                    const subjectGradesList = Object.values(periodGrades).filter(v => v > 0);
+                  const rawMedia = subjectGradesList.length > 0 ? subjectGradesList.reduce((acc, v) => acc + v, 0) / subjectGradesList.length : 0;
                   const media = rawMedia > 0 ? roundAverage(rawMedia) : 0;
                   
                   const abs = (studentAbsences as any)[subjectId] || {};
@@ -448,10 +449,9 @@ export const OfficialDocuments: React.FC<OfficialDocumentsProps> = ({ schoolId }
                     if (!groupedData[subjectName]) {
                       groupedData[subjectName] = { grades: {}, absences: {}, workload };
                     }
-                    // If multiple grades for same period/subject name, take the highest or average? 
-                    // Usually they should be the same if they are duplicates.
-                    // We'll take the latest one or just overwrite.
-                    groupedData[subjectName].grades[grade.period] = grade.value;
+                    // Keep the highest grade value if there are duplicates (same rule as ReportCard)
+                    const currentGrade = groupedData[subjectName].grades[grade.period];
+                    groupedData[subjectName].grades[grade.period] = currentGrade ? Math.max(currentGrade, grade.value) : grade.value;
                     if (workload) groupedData[subjectName].workload = workload;
                   });
 
